@@ -14,4 +14,8 @@
 #define JOY1_X_PIN 36   // VP - Servo control
 #define JOY2_Y_PIN 39   // VN - ESC control
 
+// I2C pins for the OLED screen (adjust if your wiring differs)
+#define SCREEN_SDA_PIN 21
+#define SCREEN_SCL_PIN 22
+
 #endif

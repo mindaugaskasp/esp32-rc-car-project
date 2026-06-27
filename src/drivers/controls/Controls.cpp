@@ -1,5 +1,4 @@
 #include "Controls.h"
-#include <config/DebugConfig.h>
 
 
 // return avg smooth value
@@ -11,8 +10,6 @@ int readInput(int pin) {
     }
 
     uint smoothedValue = (int) (sum / numSamples);
-
-    DEBUG_LOG_JOY(smoothedValue); 
 
     return smoothedValue;
 }

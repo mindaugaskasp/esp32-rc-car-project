@@ -1,35 +1,32 @@
 #include "ServoDriver.h"
+#include "ServoLogic.h"
 #include <config/Esp32Pins.h>
 #include <ESP32Servo.h>
 
 Servo servo;
 
-int currentServoAngle = 90;
+static int currentServoMicros = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;
 
 void initServo() {
-    servo.attach(SERVO_PIN);
+    servo.attach(SERVO_PIN, SERVO_MIN_MICROS, SERVO_MAX_MICROS);
+    servo.writeMicroseconds(currentServoMicros);
 }
 
 void setServoAngle(int rawX) {
-    servo.write(map(rawX, 0, 4095, 0, 180));
+    currentServoMicros = computeServoMicros(rawX);
+    servo.writeMicroseconds(currentServoMicros);
 }
 
 void updateServo(int rawX) {
-    int targetAngle = map(rawX, 0, 4095, 0, 180);
-    
-    // 2 degrees every loop cycle to even out the servo movement and avoid sudden jumps
-    int step = 2; 
+    int targetMicros = computeServoMicros(rawX);
 
-    if (currentServoAngle < targetAngle) {
-        currentServoAngle += step;
-    } else if (currentServoAngle > targetAngle) {
-        currentServoAngle -= step;
+    if (targetMicros > currentServoMicros + SERVO_SMOOTHING_STEP_MICROS) {
+        currentServoMicros += SERVO_SMOOTHING_STEP_MICROS;
+    } else if (targetMicros < currentServoMicros - SERVO_SMOOTHING_STEP_MICROS) {
+        currentServoMicros -= SERVO_SMOOTHING_STEP_MICROS;
+    } else {
+        currentServoMicros = targetMicros;
     }
 
-    // Ensure we don't overshoot the target
-    if (abs(currentServoAngle - targetAngle) < step) {
-        currentServoAngle = targetAngle;
-    }
-
-    servo.write(currentServoAngle);
+    servo.writeMicroseconds(currentServoMicros);
 }

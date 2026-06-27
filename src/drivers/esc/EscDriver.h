@@ -3,3 +3,4 @@
 
 void initEsc();
 void updateEscSpeed(int rawY);
+void setEscNeutral();
