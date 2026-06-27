@@ -45,6 +45,7 @@ graph TD
 | Servo | Miuzei 25KG Digital Servo | 180°, 4.8–8.4 V DC — GPIO 32 |
 | ESC | Waterproof 60A 2S LiPo BEC | 5.8 V / 3 A BEC output — GPIO 13 |
 | Motor | HobbyFans BL 3650-3900KV | 4-pole brushless, driven by ESC |
+| Hall sensor | KY-003 (3144 unipolar) module | RPM telemetry — GPIO 25 |
 | Battery | 2S LiPo | Powers ESC; BEC supplies 5.8 V to ESP32 and servo |
 
 ---
@@ -88,6 +89,7 @@ graph LR
 
     ESP -->|"GPIO 13 · PWM signal"| ESC
     ESP -->|"GPIO 32 · PWM signal"| SRV["🔧 Miuzei 25KG Servo\n180° · 4.8–8.4V"]
+    HALL["🧲 KY-003 Hall Sensor\n3144 unipolar"] -->|"GPIO 25 · digital IN"| ESP
 
     AIR[["📡 Wireless"]] -. "ESP-NOW · 2.4 GHz" .-> ESP
 ```
@@ -96,6 +98,8 @@ graph LR
 |-----|--------|-----------|--------------|
 | GPIO 13 | PWM 1–2 ms | OUT | ESC throttle signal |
 | GPIO 32 | PWM 0.5–2.5 ms | OUT | Steering servo |
+| GPIO 25 | Digital IN (active-low) | IN | Hall sensor signal (S pin) |
+| 3.3 V | Power | OUT | Hall sensor VCC |
 | 5V | Power | IN | ESC BEC output (5.8 V) |
 | GND | Ground | — | Common ground |
 
@@ -158,6 +162,47 @@ Pure computation (mapping, deadzone, clamping) is separated into header-only fil
 - **Input deadzone** — small joystick deflections near center are ignored to suppress drift.
 - **Servo smoothing** — `updateServo()` steps toward the target by at most `SERVO_SMOOTHING_STEP_MICROS` per cycle, preventing steering snap.
 - **Packet-loss watchdog** — the receiver resets the ESC to neutral if no ESP-NOW packet arrives within 500 ms.
+
+---
+
+## Hall Sensor (RPM telemetry)
+
+Motor RPM is measured on the receiver by a **KY-003 / 3144 unipolar Hall effect sensor** and sent back to the transmitter as part of the `TelemetryData` packet. The transmitter dashboard displays RPM live.
+
+### Wiring
+
+```
+Hall sensor   →   ESP32 receiver
+──────────────────────────────────
+VCC           →   3.3 V   (do NOT use 5 V on the ESP32 GPIO)
+GND           →   GND
+S (signal)    →   GPIO 25
+```
+
+The module has a built-in pull-up resistor and indicator LED — no external components needed. The output is **active-low** (HIGH = no magnet, LOW = magnet detected).
+
+### Sensor orientation
+
+The **3144 is a unipolar sensor** — it only responds to the **south pole** of a magnet. If the indicator LED does not light up when you bring a magnet close, flip the magnet over.
+
+### Placement and `HALL_PULSES_PER_REV`
+
+| Placement | `HALL_PULSES_PER_REV` | Notes |
+|-----------|----------------------|-------|
+| Near motor rotor (testing) | `2` | 4-pole motor has 2 south-pole faces per revolution |
+| Reduction gear with 1 magnet | `1` | Single magnet glued to gear or wheel |
+| Gear with N magnets | `N` | Space magnets evenly for accurate reading |
+
+Set `HALL_PULSES_PER_REV` in `src/config/ControlConfig.h`.
+
+### Noise filtering
+
+The ESC and brushless motor generate significant switching noise. The driver applies two layers of filtering to prevent false RPM readings:
+
+- **ISR debounce** (`HALL_MIN_PULSE_INTERVAL_US`, default 1000 µs) — pulses arriving faster than 1 ms apart are discarded in the interrupt handler. This corresponds to > 30 000 RPM and is physically impossible for this motor, so all faster signals are noise.
+- **Minimum pulse threshold** (`HALL_MIN_PULSES_FOR_RPM`, default 3) — fewer than 3 pulses per 150 ms window reports 0 RPM, eliminating stray pulses that survive the debounce.
+
+If false readings persist at idle, add a **100 nF ceramic capacitor** between the signal wire and GND directly at the sensor header pins.
 
 ---
 

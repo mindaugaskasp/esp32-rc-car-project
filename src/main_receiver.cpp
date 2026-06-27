@@ -4,6 +4,7 @@
 #include "drivers/debug/DebugLogger.h"
 #include "drivers/servo/ServoDriver.h"
 #include "drivers/esc/EscDriver.h"
+#include "drivers/hall/HallSensorDriver.h"
 #include "drivers/wifi/EspNowDriver.h"
 #include <esp_now.h>
 
@@ -47,8 +48,8 @@ static void handleVehiclePacket(const uint8_t *mac, const VehicleData &data) {
     updateEscSpeed(data.escSpeed);
     
     TelemetryData telemetry;
-    telemetry.batteryVoltage = 7.4; // Replace with actual voltage function
-    telemetry.speedRpm = 50;        // Replace with actual speed function
+    telemetry.batteryVoltage = 7.4f; // TODO: replace with ADC voltage divider reading
+    telemetry.speedRpm = getMotorRpm();
     
     debugLogger.logf("Received data: servo=%d esc=%d", data.servoPos, data.escSpeed);
 
@@ -103,7 +104,8 @@ void setup() {
 
     initServo();
     initEsc();
-    debugLogger.log("Servo and ESC initialized");
+    initHallSensor();
+    debugLogger.log("Servo, ESC, and Hall sensor initialized");
     
     initEspNow();
     addPeer(TRANSMITTER_MAC);
@@ -112,6 +114,7 @@ void setup() {
 }
 
 void loop() {
+    updateHallSensor();
     processPendingPacket();
 
     unsigned long now = millis();

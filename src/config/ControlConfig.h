@@ -26,6 +26,26 @@
 // When enabled the ESC output is mirrored around neutral so Y-up = forward.
 #define THROTTLE_INVERT false
 
+// Hall effect sensor — pulses per full motor shaft revolution.
+// When testing near the 4-pole brushless motor rotor: set to 2
+//   (the rotor has 2 south-pole faces that trigger the 3144 per revolution).
+// When mounted at the reduction gear with a single magnet: set to 1.
+#define HALL_PULSES_PER_REV 2
+
+// RPM is recalculated every this many milliseconds. Shorter = more responsive
+// but noisier at low RPM (fewer pulses per window). 100–200 ms is a good range.
+#define HALL_RPM_INTERVAL_MS 150
+
+// ISR debounce: ignore any pulse arriving sooner than this after the previous
+// one. At 30 000 RPM with 2 pulses/rev the minimum real interval is ~1 000 µs.
+// Anything faster is ESC/motor switching noise on the signal wire.
+#define HALL_MIN_PULSE_INTERVAL_US 1000
+
+// Minimum pulses per interval window required to report a non-zero RPM.
+// Stray noise pulses that survive the debounce are usually 1-2 per window;
+// legitimate rotation produces many more. Raise if idle noise is still visible.
+#define HALL_MIN_PULSES_FOR_RPM 3
+
 // Set to true to launch the guided calibration menu on boot.
 // Use Y-tap to navigate, Y-hold 1.5 s to select a calibration.
 // Set back to false after calibration is complete.

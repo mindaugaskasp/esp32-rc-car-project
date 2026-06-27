@@ -135,6 +135,7 @@ if (rawY > 1900 && rawY < 2200) ...  // bad — these should be named constants 
 
 ### Pin Configuration (`config/Esp32Pins.h`)
 All GPIO pin numbers as `const int`. Descriptive names: `DEVICE_PIN` format.
+The canonical file is `src/config/Esp32Pins.h` — the only copy; the stale `include/` directory has been removed.
 
 ### Debug Configuration (`config/DebugConfig.h`)
 Boolean flags per subsystem with tagged macros. Flag the build down to zero overhead when disabled.
@@ -328,6 +329,28 @@ Only pure logic is testable natively. The rule is:
 8. Add debug macros to `config/DebugConfig.h` if needed
 9. Add library to `platformio.ini` if needed
 10. Write tests for any `*Logic.h` functions
+11. **Update `build_src_filter` in `platformio.ini`** — see rule below
+
+### `build_src_filter` rule — MANDATORY for every new driver
+
+Both `transmitter` and `receiver` environments use `+<drivers/>`, which means **every file in `src/drivers/` compiles for both targets by default**. Any driver that is hardware-specific to one board MUST be excluded from the other environment or the build will fail.
+
+| Driver is used by | Action required |
+|-------------------|-----------------|
+| Both boards | Nothing — already included via `+<drivers/>` |
+| Receiver only | Add `-<drivers/category/>` to the transmitter `build_src_filter` |
+| Transmitter only | Add `-<drivers/category/>` to the receiver `build_src_filter` |
+
+**Current exclusions (update this table when adding new drivers):**
+
+| Directory | Excluded from |
+|-----------|--------------|
+| `drivers/esc/` | transmitter |
+| `drivers/servo/` | transmitter |
+| `drivers/hall/` | transmitter |
+| `drivers/screen/` | receiver |
+
+Forgetting this step causes "not declared in this scope" or linker errors in the environment that shouldn't compile that driver.
 
 ---
 
