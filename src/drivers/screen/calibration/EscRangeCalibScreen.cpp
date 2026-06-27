@@ -1,5 +1,5 @@
 #include "EscRangeCalibScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include <Arduino.h>
 
 static const int RAW_MAX_THRESHOLD  = 3800;
@@ -44,7 +44,7 @@ VehicleData EscRangeCalibScreen::update(int rawX, int rawY) {
             break;
         }
         case EscCalibStep::WaitForMin: {
-            showStep(3, 5, "ESC is in calib\nPush Y to MIN", rawY);
+            showStep(3, 5, "ESC ON: push Y\nto full MIN", rawY);
             if (rawY <= RAW_MIN_THRESHOLD) {
                 _detectedMin = rawY;
                 _step = EscCalibStep::HoldMin;
@@ -60,13 +60,13 @@ VehicleData EscRangeCalibScreen::update(int rawX, int rawY) {
             }
             int secsLeft = (int)((HOLDMIN_MS - min(elapsed, HOLDMIN_MS)) / 1000) + 1;
             char inst[36];
-            snprintf(inst, sizeof(inst), "ESC registers MIN\nHold: %ds left", secsLeft);
+            snprintf(inst, sizeof(inst), "ESC ON: hold MIN\n%ds left", secsLeft);
             showStep(4, 5, inst, 0);
             sendY = 0;  // Full-range min so ESC learns exactly ESC_MIN_MICROS
             break;
         }
         case EscCalibStep::WaitForNeutral: {
-            showStep(5, 5, "Release Y to CTR\nESC will arm", rawY);
+            showStep(5, 5, "ESC ON: center Y\nESC arms at CTR", rawY);
             if (abs(rawY - 2048) <= RAW_NEUTRAL_BAND) {
                 _step = EscCalibStep::Complete;
                 showComplete();
@@ -87,11 +87,11 @@ bool EscRangeCalibScreen::isComplete() const {
 
 void EscRangeCalibScreen::showStep(uint8_t stepNum, uint8_t totalSteps, const char* instruction, int rawY) {
     ScreenDriver* d = getScreenDriver();
-    if (d) d->displayCalibrationStep("ESC RANGE CAL", stepNum, totalSteps, instruction, rawY);
+    if (d) drawCalibStep(*d,"ESC RANGE CAL", stepNum, totalSteps, instruction, rawY);
 }
 
 void EscRangeCalibScreen::showComplete() {
     ScreenDriver* d = getScreenDriver();
     if (!d) return;
-    d->displayCalibrationResult("ESC CALIB DONE", "ESC armed & ready!", "Recalibrate if motor", "creeps at neutral.");
+    drawCalibResult(*d,"ESC CALIB DONE", "ESC armed & ready!", "Recalibrate if motor", "creeps at neutral.");
 }

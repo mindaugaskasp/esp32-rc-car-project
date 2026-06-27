@@ -18,6 +18,8 @@ class CalibrationFlow {
 public:
     void begin();
     VehicleData update(int rawX, int rawY);
+    // Returns true (once) when the user taps X-left at the menu root to exit.
+    bool wantsExit();
 
 private:
     enum class State : uint8_t { Menu, Running, ResultPause };
@@ -47,11 +49,9 @@ private:
     unsigned long _yUpStart   = 0;
     unsigned long _yDownStart = 0;
 
-    // X gesture state (enter / exit)
-    bool _xWasRight = false;
-    bool _xWasLeft  = false;
-    unsigned long _xRightStart = 0;
-    unsigned long _xLeftStart  = 0;
+    // SW button state (enter / exit)
+    bool _sw1Was = false;  // JOY1_SW — cancel / exit
+    bool _sw2Was = false;  // JOY2_SW — confirm / enter
 
     VehicleData updateMenu(int rawX, int rawY);
     VehicleData updateRunning(int rawX, int rawY);
@@ -59,6 +59,8 @@ private:
     VehicleData dispatchUpdate(int rawX, int rawY);
     bool        dispatchIsComplete();
     void        showMenu();
+
+    bool _wantsExit = false;
 };
 
 extern CalibrationFlow calibrationFlow;

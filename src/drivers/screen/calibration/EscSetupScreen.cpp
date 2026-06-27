@@ -1,5 +1,5 @@
 #include "EscSetupScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include "drivers/debug/DebugLogger.h"
 #include <Arduino.h>
 
@@ -8,7 +8,7 @@ void EscSetupScreen::begin() {
     _stateEnteredAt = 0;
     _yWasUp         = false;
     ScreenDriver* d = getScreenDriver();
-    if (d) d->displayCalibrationResult("ESC FULL SETUP",
+    if (d) drawCalibResult(*d,"ESC FULL SETUP",
         "RESETS all 17 params!", "Run Motor Dir + LV", "after. Y-up=OK");
 }
 
@@ -30,7 +30,7 @@ VehicleData EscSetupScreen::update(int rawX, int rawY) {
                 debugLogger.log("[ESC SETUP] Confirmed. Waiting for ESC off.");
                 transitionTo(State::WaitStart);
                 ScreenDriver* d = getScreenDriver();
-                if (d) d->displayCalibrationResult("ESC FULL SETUP",
+                if (d) drawCalibResult(*d,"ESC FULL SETUP",
                     "Turn OFF ESC now.", "Y-up when ready.", nullptr);
             }
             break;
@@ -47,7 +47,7 @@ VehicleData EscSetupScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "POWER ON ESC  %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC FULL SETUP", 1, 4, msg,
+            if (d) drawCalibStep(*d,"ESC FULL SETUP", 1, 4, msg,
                 constrain((int)((long)elapsed * 4095 / ENTRY_THROTTLE_MS), 0, 4095));
             if (elapsed >= ENTRY_THROTTLE_MS) transitionTo(State::EntryBrake);
             _yWasUp = yUp;
@@ -59,7 +59,7 @@ VehicleData EscSetupScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Entering prog %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC FULL SETUP", 2, 4, msg, 0);
+            if (d) drawCalibStep(*d,"ESC FULL SETUP", 2, 4, msg, 0);
             if (elapsed >= ENTRY_BRAKE_MS) {
                 debugLogger.log("[ESC SETUP] In programming mode. Confirming all 17 rows...");
                 transitionTo(State::Programming);
@@ -77,7 +77,7 @@ VehicleData EscSetupScreen::update(int rawX, int rawY) {
             char msg[24];
             snprintf(msg, sizeof(msg), "Row %d/17  %ds left", row, secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC FULL SETUP", 3, 4, msg, 0);
+            if (d) drawCalibStep(*d,"ESC FULL SETUP", 3, 4, msg, 0);
             if (elapsed >= TOTAL_MS) {
                 debugLogger.log("[ESC SETUP] All rows confirmed. Saving...");
                 transitionTo(State::ExitProg);
@@ -91,12 +91,12 @@ VehicleData EscSetupScreen::update(int rawX, int rawY) {
             char msg[16];
             snprintf(msg, sizeof(msg), "Saving... %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC FULL SETUP", 4, 4, msg, 4095);
+            if (d) drawCalibStep(*d,"ESC FULL SETUP", 4, 4, msg, 4095);
             if (elapsed >= EXIT_MS) {
                 debugLogger.log("[ESC SETUP] Done. Power cycle ESC, then run Motor Dir + LV calib.");
                 _state = State::Complete;
                 ScreenDriver* d2 = getScreenDriver();
-                if (d2) d2->displayCalibrationResult("ESC SETUP DONE",
+                if (d2) drawCalibResult(*d2,"ESC SETUP DONE",
                     "Power cycle ESC.", "Run Motor Dir +", "Low Voltage calib.");
             }
             _yWasUp = yUp;

@@ -1,5 +1,8 @@
 #include "CalibrationFlow.h"
 #include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
+#include "drivers/controls/Controls.h"
+#include "config/Esp32Pins.h"
 #include <Arduino.h>
 
 CalibrationFlow calibrationFlow;
@@ -16,11 +19,17 @@ const char* const CalibrationFlow::ITEM_NAMES[ITEM_COUNT] = {
 };
 
 void CalibrationFlow::begin() {
-    _state  = State::Menu;
-    _cursor = 0;
-    _active = -1;
-    _yWasUp = _yWasDown = _xWasRight = _xWasLeft = false;
+    _state      = State::Menu;
+    _cursor     = 0;
+    _active     = -1;
+    _wantsExit  = false;
+    _yWasUp = _yWasDown = _sw1Was = _sw2Was = false;
     showMenu();
+}
+
+bool CalibrationFlow::wantsExit() {
+    if (_wantsExit) { _wantsExit = false; return true; }
+    return false;
 }
 
 VehicleData CalibrationFlow::update(int rawX, int rawY) {
@@ -40,14 +49,15 @@ VehicleData CalibrationFlow::update(int rawX, int rawY) {
 }
 
 VehicleData CalibrationFlow::updateMenu(int rawX, int rawY) {
+    (void)rawX;
     unsigned long now = millis();
-    bool yUp    = rawY > 3500;
-    bool yDown  = rawY < 500;
-    bool xRight = rawX > 3500;
+    bool yUp  = rawY > 3500;
+    bool yDown = rawY < 500;
+    bool sw1  = readButton(JOY1_SW_PIN);
+    bool sw2  = readButton(JOY2_SW_PIN);
 
-    if (yUp    && !_yWasUp)    _yUpStart    = now;
-    if (yDown  && !_yWasDown)  _yDownStart  = now;
-    if (xRight && !_xWasRight) _xRightStart = now;
+    if (yUp   && !_yWasUp)   _yUpStart   = now;
+    if (yDown && !_yWasDown) _yDownStart = now;
 
     // Y-tap: navigate cursor
     if (!yUp && _yWasUp && (now - _yUpStart < TAP_MAX_MS)) {
@@ -59,33 +69,36 @@ VehicleData CalibrationFlow::updateMenu(int rawX, int rawY) {
         showMenu();
     }
 
-    // X-right tap: launch selected calibration
-    if (!xRight && _xWasRight && (now - _xRightStart < TAP_MAX_MS)) {
+    // SW2 press (throttle stick): launch selected calibration
+    if (sw2 && !_sw2Was) {
         _active = _cursor;
         _state  = State::Running;
         launchActive();
-        _yWasUp = _yWasDown = _xWasRight = false;
+        _yWasUp = _yWasDown = _sw1Was = _sw2Was = false;
         return {2048, 2048};
     }
 
-    _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+    // SW1 press (steering stick): exit calibration back to mode selector
+    if (sw1 && !_sw1Was) {
+        _wantsExit = true;
+    }
+
+    _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1; _sw2Was = sw2;
     return {2048, 2048};
 }
 
 VehicleData CalibrationFlow::updateRunning(int rawX, int rawY) {
-    unsigned long now = millis();
-    bool xLeft = rawX < 500;
-    if (xLeft && !_xWasLeft) _xLeftStart = now;
+    bool sw1 = readButton(JOY1_SW_PIN);
 
-    // X-left tap: cancel and return to menu
-    if (!xLeft && _xWasLeft && (now - _xLeftStart < TAP_MAX_MS)) {
+    // SW1 press (steering stick): cancel running calibration and return to menu
+    if (sw1 && !_sw1Was) {
         _state  = State::Menu;
         _active = -1;
-        _xWasLeft = _xWasRight = false;
+        _sw1Was = _sw2Was = false;
         showMenu();
         return {2048, 2048};
     }
-    _xWasLeft = xLeft;
+    _sw1Was = sw1;
 
     VehicleData data = dispatchUpdate(rawX, rawY);
 
@@ -142,11 +155,11 @@ void CalibrationFlow::showMenu() {
     ScreenDriver* d = getScreenDriver();
     if (!d) return;
 
-    const char* above = (_cursor > 0)              ? ITEM_NAMES[_cursor - 1] : "X>:enter  <X:exit";
-    const char* below = (_cursor < ITEM_COUNT - 1) ? ITEM_NAMES[_cursor + 1] : "";
+    const char* above = (_cursor > 0)              ? ITEM_NAMES[_cursor - 1] : nullptr;
+    const char* below = (_cursor < ITEM_COUNT - 1) ? ITEM_NAMES[_cursor + 1] : nullptr;
 
     char selected[26];
     snprintf(selected, sizeof(selected), "> %s", ITEM_NAMES[_cursor]);
 
-    d->displayCalibrationResult("CALIBRATION  Y:nav", above, selected, below);
+    drawCalibMenu(*d, above, selected, below);
 }

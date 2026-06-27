@@ -4,7 +4,7 @@
 // Config values (from ControlConfig.h):
 //   SERVO_NEUTRAL_MICROS=1500, SERVO_CENTER_TRIM_MICROS=80  -> center=1580
 //   SERVO_MIN_MICROS=500, SERVO_MAX_MICROS=2500
-//   JOY_DEADZONE=75, SERVO_JOYSTICK_CENTER_RAW=2048
+//   JOY_DEADZONE_X_X=150, SERVO_JOYSTICK_CENTER_RAW=2048
 //   JOYSTICK_X_MIN=100, JOYSTICK_X_MAX=3950
 
 static const int CENTER = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS; // 1580
@@ -20,19 +20,19 @@ void test_center_returns_neutral_with_trim() {
 
 void test_deadzone_left_boundary_still_neutral() {
     // abs(2048 - 75 - 2048) = 75, not > 75 -> still center
-    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW - JOY_DEADZONE));
+    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW - JOY_DEADZONE_X));
 }
 
 void test_deadzone_right_boundary_still_neutral() {
-    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW + JOY_DEADZONE));
+    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW + JOY_DEADZONE_X));
 }
 
 void test_just_outside_deadzone_right_exceeds_center() {
-    TEST_ASSERT_GREATER_THAN(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW + JOY_DEADZONE + 1));
+    TEST_ASSERT_GREATER_THAN(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW + JOY_DEADZONE_X + 1));
 }
 
 void test_just_outside_deadzone_left_below_center() {
-    TEST_ASSERT_LESS_THAN(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW - JOY_DEADZONE - 1));
+    TEST_ASSERT_LESS_THAN(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW - JOY_DEADZONE_X - 1));
 }
 
 // --- Calibrated endpoints ---

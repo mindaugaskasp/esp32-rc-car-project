@@ -49,12 +49,11 @@ private:
 
     unsigned long _stateEnteredAt = 0;
 
-    bool _yWasUp    = false;
-    bool _yWasDown  = false;
-    bool _xWasRight = false;
-    unsigned long _yUpStart    = 0;
-    unsigned long _yDownStart  = 0;
-    unsigned long _xRightStart = 0;
+    bool _yWasUp   = false;
+    bool _yWasDown = false;
+    bool _sw1Was   = false;  // JOY1_SW — advance to next param / confirm
+    unsigned long _yUpStart   = 0;
+    unsigned long _yDownStart = 0;
 
     static const unsigned long TAP_MAX_MS        =  700;
     static const unsigned long ENTRY_THROTTLE_MS = 5000;

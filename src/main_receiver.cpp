@@ -50,6 +50,7 @@ static void handleVehiclePacket(const uint8_t *mac, const VehicleData &data) {
     TelemetryData telemetry;
     telemetry.batteryVoltage = 7.4f; // TODO: replace with ADC voltage divider reading
     telemetry.speedRpm = getMotorRpm();
+    telemetry.echoTimestampMs = data.txTimestampMs;
     
     debugLogger.logf("Received data: servo=%d esc=%d", data.servoPos, data.escSpeed);
 
@@ -98,7 +99,6 @@ static void processPendingPacket() {
 void setup() {
     Serial.begin(BAUD_RATE);
     delay(500);  // Wait for serial monitor to connect
-    debugLogger.enableScreenLogging(DEBUG_SCREEN);
     debugLogger.log("RC Car Starting...");
     printMacAddress();
 

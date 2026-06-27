@@ -1,5 +1,5 @@
 #include "LowVoltageCalibScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include "drivers/debug/DebugLogger.h"
 #include <Arduino.h>
 
@@ -76,7 +76,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
                     _cells, thresholdDv() / 10, thresholdDv() % 10);
                 transitionTo(State::WaitStart);
                 ScreenDriver* d = getScreenDriver();
-                if (d) d->displayCalibrationResult("LOW VOLTAGE PROG",
+                if (d) drawCalibResult(*d,"LOW VOLTAGE PROG",
                     "Turn OFF ESC now.", "Y-up when ready.", nullptr);
             }
             if (yDown && !_yWasDown) {
@@ -85,7 +85,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
                     _cells, thresholdDv() / 10, thresholdDv() % 10);
                 transitionTo(State::WaitStart);
                 ScreenDriver* d = getScreenDriver();
-                if (d) d->displayCalibrationResult("LOW VOLTAGE PROG",
+                if (d) drawCalibResult(*d,"LOW VOLTAGE PROG",
                     "Turn OFF ESC now.", "Y-up when ready.", nullptr);
             }
             break;
@@ -106,7 +106,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "POWER ON ESC  %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 1, 5, msg,
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 1, 5, msg,
                 constrain((int)((long)elapsed * 4095 / ENTRY_THROTTLE_MS), 0, 4095));
             if (elapsed >= ENTRY_THROTTLE_MS) transitionTo(State::EntryBrake);
             _yWasUp = yUp; _yWasDown = yDown;
@@ -118,7 +118,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Entering prog %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 2, 5, msg, 0);
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 2, 5, msg, 0);
             if (elapsed >= ENTRY_BRAKE_MS) {
                 debugLogger.log("[LOW VOLT] ESC in prog mode. Skipping rows 1-11...");
                 transitionTo(State::SkipEarly);
@@ -135,7 +135,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Row %d/11  %ds left", row, secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 3, 5, msg, 0);
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 3, 5, msg, 0);
             if (elapsed >= skipMs) {
                 _currentRow   = 12;
                 _advancesLeft = _cells - 2;  // 2S→pos1(0), 3S→pos2(1), ...
@@ -150,7 +150,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Row %d  adv %d left", _currentRow, _advancesLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 4, 5, msg, 4095);
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 4, 5, msg, 4095);
             if (elapsed >= ADVANCE_MS) {
                 _advancesLeft--;
                 if (_advancesLeft > 0) transitionTo(State::Advancing);
@@ -171,7 +171,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Confirm row %d  %ds", _currentRow, secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 4, 5, msg, 0);
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 4, 5, msg, 0);
             if (elapsed >= ROW_MS) {
                 debugLogger.logf("[LOW VOLT] Row %d confirmed.", _currentRow);
                 enterNextRow();
@@ -187,7 +187,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Finalising...  %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 5, 5, msg, 0);
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 5, 5, msg, 0);
             if (elapsed >= skipMs) transitionTo(State::ExitProg);
             _yWasUp = yUp; _yWasDown = yDown;
             return {2048, 0};
@@ -198,7 +198,7 @@ VehicleData LowVoltageCalibScreen::update(int rawX, int rawY) {
             char msg[16];
             snprintf(msg, sizeof(msg), "Saving... %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("LOW VOLT PROG", 5, 5, msg, 4095);
+            if (d) drawCalibStep(*d,"LOW VOLT PROG", 5, 5, msg, 4095);
             if (elapsed >= EXIT_MS) {
                 printResult();
                 _state = State::ProgramDone;
@@ -242,7 +242,7 @@ void LowVoltageCalibScreen::showCells() {
     if (!d) return;
     char inst[24];
     snprintf(inst, sizeof(inst), "Cells: %dS  Y-tap", _cells);
-    d->displayCalibrationStep("LOW VOLT CUTOFF", 1, 3, inst, -1);
+    drawCalibStep(*d,"LOW VOLT CUTOFF", 1, 3, inst, -1);
 }
 
 void LowVoltageCalibScreen::showThreshold() {
@@ -251,13 +251,13 @@ void LowVoltageCalibScreen::showThreshold() {
     int dv = thresholdDv();
     char inst[24];
     snprintf(inst, sizeof(inst), "%d.%dV/cell  Y-tap", dv / 10, dv % 10);
-    d->displayCalibrationStep("LOW VOLT CUTOFF", 2, 3, inst, -1);
+    drawCalibStep(*d,"LOW VOLT CUTOFF", 2, 3, inst, -1);
 }
 
 void LowVoltageCalibScreen::showProtection() {
     ScreenDriver* d = getScreenDriver();
     if (!d) return;
-    d->displayCalibrationResult("LV PROTECTION",
+    drawCalibResult(*d,"LV PROTECTION",
         "Y-up: Reduce power", "Y-dn: Cut off", "(Row 14)");
 }
 
@@ -268,7 +268,7 @@ void LowVoltageCalibScreen::showResult() {
     char l1[28], l2[28];
     snprintf(l1, sizeof(l1), "%dS %d.%dV=%d.%dV", _cells, dv/10, dv%10, packDv/10, packDv%10);
     snprintf(l2, sizeof(l2), "Prot: %s", _protect ? "cut off" : "reduce pwr");
-    d->displayCalibrationResult("LV PROG DONE", l1, l2, "Power cycle ESC.");
+    drawCalibResult(*d,"LV PROG DONE", l1, l2, "Power cycle ESC.");
 }
 
 void LowVoltageCalibScreen::printResult() {

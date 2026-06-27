@@ -11,10 +11,6 @@ static void logSerial(const char* message) {
     Serial.println(timestamped);
 }
 
-void DebugLogger::enableScreenLogging(bool enabled) {
-    this->screenEnabled = enabled;
-}
-
 void DebugLogger::log(const char* message) {
     logSerial(message);
 }
@@ -29,7 +25,7 @@ void DebugLogger::logf(const char* format, ...) {
 }
 
 void DebugLogger::logJoystick(int x, int y) {
-    if (!DEBUG_JOYSTICK) {
+    if (!DEBUG_JOYSTICK_TO_SERIAL) {
         return;
     }
     char buffer[128];
@@ -38,7 +34,7 @@ void DebugLogger::logJoystick(int x, int y) {
 }
 
 void DebugLogger::logEsc(int speed) {
-    if (!DEBUG_ESC) {
+    if (!CALIBRATION_DEBUG_SCREEN_ENABLED) {
         return;
     }
     char buffer[128];

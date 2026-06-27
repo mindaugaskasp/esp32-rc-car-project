@@ -2,13 +2,8 @@
 
 class DebugScreen {
 public:
-    void enable(bool enabled);
-    bool isEnabled() const;
-    void showJoystickMoved(int joystickX, int joystickY);
-    void showTelemetryReceived(float batteryVoltage, int speedRpm);
-
-private:
-    bool enabled = false;
+    void showJoystickData(int joystickX, int joystickY);
+    void showTelemetry(float batteryVoltage, int speedRpm);
 };
 
 extern DebugScreen debugScreen;

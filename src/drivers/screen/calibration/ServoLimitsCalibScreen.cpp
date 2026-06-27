@@ -1,5 +1,5 @@
 #include "ServoLimitsCalibScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include "drivers/debug/DebugLogger.h"
 #include "config/ControlConfig.h"
 #include <Arduino.h>
@@ -51,7 +51,7 @@ void ServoLimitsCalibScreen::showTest(int rawX, bool isLeft) {
     if (!d) return;
     uint8_t step = isLeft ? 1 : 2;
     const char* inst = isLeft ? "Steer LEFT to stop" : "Steer RIGHT to stop";
-    d->displayCalibrationStep("SERVO LIMITS", step, 2, inst, rawX);
+    drawCalibStep(*d,"SERVO LIMITS", step, 2, inst, rawX);
 }
 
 void ServoLimitsCalibScreen::showResult() {
@@ -60,7 +60,7 @@ void ServoLimitsCalibScreen::showResult() {
     char l1[28], l2[28];
     snprintf(l1, sizeof(l1), "L limit: ~%d us", rawToMicros(_leftRaw));
     snprintf(l2, sizeof(l2), "R limit: ~%d us", rawToMicros(_rightRaw));
-    d->displayCalibrationResult("LIMITS FOUND", l1, l2, "Check Serial for config");
+    drawCalibResult(*d,"LIMITS FOUND", l1, l2, "Check Serial for config");
 }
 
 void ServoLimitsCalibScreen::printResult() {

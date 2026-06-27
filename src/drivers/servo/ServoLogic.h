@@ -16,7 +16,7 @@ inline int computeServoMicros(int rawX) {
     int diff = rawX - SERVO_JOYSTICK_CENTER_RAW;
     if (diff < 0) diff = -diff;
 
-    if (diff > JOY_DEADZONE) {
+    if (diff > JOY_DEADZONE_X) {
         if (rawX < SERVO_JOYSTICK_CENTER_RAW) {
             // Equivalent to: map(rawX, JOYSTICK_X_MIN, SERVO_JOYSTICK_CENTER_RAW, SERVO_MIN_MICROS, center)
             targetMicros = (int)((long)(rawX - JOYSTICK_X_MIN) * (center - SERVO_MIN_MICROS)

@@ -6,9 +6,10 @@
 // The module has a built-in pull-up resistor and indicator LED.
 //
 // Wiring:
-//   VCC  → 3.3 V  (module regulates internally; do NOT use 5 V on ESP32)
+//   VCC  → 5 V  (sensor rated 4.5–24 V; 3.3 V is below spec → false readings)
 //   GND  → GND
-//   S    → HALL_SENSOR_PIN (GPIO 25)
+//   S    → 10 kΩ → GPIO 25, and 20 kΩ from GPIO 25 to GND
+//          (voltage divider: 5 V × 20/30 = 3.33 V, safe for ESP32 3.3 V GPIO)
 //
 // The 3144 is a UNIPOLAR sensor — it only responds to the SOUTH pole of a
 // magnet. Hold the correct face of your magnet toward the sensor dot.

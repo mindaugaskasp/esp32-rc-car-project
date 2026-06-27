@@ -1,5 +1,5 @@
 #include "JoystickCalibScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include "drivers/debug/DebugLogger.h"
 #include <Arduino.h>
 
@@ -60,17 +60,17 @@ void JoystickCalibScreen::showRelease(int secondsLeft) {
     if (!d) return;
     char inst[24];
     snprintf(inst, sizeof(inst), "Release sticks: %ds", secondsLeft);
-    d->displayCalibrationStep("JOY CALIBRATION", 1, 2, inst, -1);
+    drawCalibStep(*d,"JOY CALIBRATION", 1, 2, inst, -1);
 }
 
 void JoystickCalibScreen::showMeasuring(int progressRaw) {
     ScreenDriver* d = getScreenDriver();
-    if (d) d->displayCalibrationStep("JOY CALIBRATION", 1, 2, "Measuring center...", progressRaw);
+    if (d) drawCalibStep(*d,"JOY CALIBRATION", 1, 2, "Measuring center...", progressRaw);
 }
 
 void JoystickCalibScreen::showSweep(int rawX, int rawY) {
     ScreenDriver* d = getScreenDriver();
-    if (d) d->displayCalibrationStep("JOY CALIBRATION", 2, 2, "Sweep all corners!", rawY);
+    if (d) drawCalibStep(*d,"JOY CALIBRATION", 2, 2, "Sweep all corners!", rawY);
     (void)rawX;
 }
 
@@ -82,7 +82,7 @@ void JoystickCalibScreen::showResult() {
     snprintf(l2, sizeof(l2), "Y ctr=%d %d-%d", _centerY, _minY, _maxY);
     int dz = max(abs(_centerX - _minX), abs(_maxX - _centerX)) / 20;
     snprintf(l3, sizeof(l3), "Suggested DZ: %d", dz);
-    d->displayCalibrationResult("JOY CAL DONE", l1, l2, l3);
+    drawCalibResult(*d,"JOY CAL DONE", l1, l2, l3);
 }
 
 void JoystickCalibScreen::printResults() {

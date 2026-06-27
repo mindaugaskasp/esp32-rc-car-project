@@ -1,6 +1,8 @@
 #include "EscParamScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include "drivers/debug/DebugLogger.h"
+#include "drivers/controls/Controls.h"
+#include "config/Esp32Pins.h"
 #include <Arduino.h>
 
 // Parameter table: rows 1-12 from the ESC datasheet.
@@ -66,25 +68,24 @@ void EscParamScreen::begin() {
     _paramIdx  = 0;
     _progParam = 0;
     for (uint8_t i = 0; i < PARAM_COUNT; i++) _values[i] = 0;
-    _yWasUp = _yWasDown = _xWasRight = false;
+    _yWasUp = _yWasDown = _sw1Was = false;
     showEditor();
 }
 
 VehicleData EscParamScreen::update(int rawX, int rawY) {
     unsigned long now     = millis();
     unsigned long elapsed = now - _stateEnteredAt;
-    bool yUp    = rawY > 3500;
-    bool yDown  = rawY < 500;
-    bool xRight = rawX > 3500;
+    bool yUp   = rawY > 3500;
+    bool yDown = rawY < 500;
+    bool sw1   = readButton(JOY2_SW_PIN);  // SW2 (throttle stick) = confirm/next
 
     switch (_state) {
 
         // ── Parameter editor ─────────────────────────────────────────────────
 
         case State::Editing: {
-            if (yUp    && !_yWasUp)    _yUpStart    = now;
-            if (yDown  && !_yWasDown)  _yDownStart  = now;
-            if (xRight && !_xWasRight) _xRightStart = now;
+            if (yUp   && !_yWasUp)   _yUpStart   = now;
+            if (yDown && !_yWasDown) _yDownStart = now;
 
             uint8_t optCount = PARAMS[_paramIdx].optCount;
 
@@ -98,7 +99,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
                     ? _values[_paramIdx] - 1 : optCount - 1;
                 showEditor();
             }
-            if (!xRight && _xWasRight && (now - _xRightStart < TAP_MAX_MS)) {
+            if (sw1 && !_sw1Was) {
                 if (_paramIdx < PARAM_COUNT - 1) {
                     _paramIdx++;
                     showEditor();
@@ -117,7 +118,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
                 debugLogger.log("[ESC PARAM] Confirmed. Turn off ESC.");
                 transitionTo(State::WaitStart);
                 ScreenDriver* d = getScreenDriver();
-                if (d) d->displayCalibrationResult("ESC PARAM PROG",
+                if (d) drawCalibResult(*d,"ESC PARAM PROG",
                     "Turn OFF ESC now.", "Y-up when ready.", nullptr);
             }
             break;
@@ -138,10 +139,10 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "POWER ON ESC  %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC PARAM", 1, 4, msg,
+            if (d) drawCalibStep(*d,"ESC PARAM", 1, 4, msg,
                 constrain((int)((long)elapsed * 4095 / ENTRY_THROTTLE_MS), 0, 4095));
             if (elapsed >= ENTRY_THROTTLE_MS) transitionTo(State::EntryBrake);
-            _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
             return {2048, 4095};
         }
 
@@ -150,7 +151,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
             char msg[22];
             snprintf(msg, sizeof(msg), "Entering prog %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC PARAM", 2, 4, msg, 0);
+            if (d) drawCalibStep(*d,"ESC PARAM", 2, 4, msg, 0);
             if (elapsed >= ENTRY_BRAKE_MS) {
                 debugLogger.log("[ESC PARAM] In prog mode. Row 1...");
                 _progParam    = 0;
@@ -158,7 +159,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
                 if (_advancesLeft > 0) transitionTo(State::Advancing);
                 else transitionTo(State::Confirming);
             }
-            _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
             return {2048, 0};
         }
 
@@ -166,19 +167,19 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
             char msg[24];
             snprintf(msg, sizeof(msg), "R%d: adv %d left", _progParam + 1, _advancesLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC PARAM", 3, 4, msg, 4095);
+            if (d) drawCalibStep(*d,"ESC PARAM", 3, 4, msg, 4095);
             if (elapsed >= ADVANCE_MS) {
                 _advancesLeft--;
                 if (_advancesLeft > 0) transitionTo(State::Advancing);
                 else transitionTo(State::Settling);
             }
-            _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
             return {2048, 4095};
         }
 
         case State::Settling: {
             if (elapsed >= SETTLE_MS) transitionTo(State::Confirming);
-            _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
             return {2048, 0};
         }
 
@@ -187,7 +188,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
             char msg[24];
             snprintf(msg, sizeof(msg), "Confirm R%d  %ds", _progParam + 1, secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC PARAM", 3, 4, msg, 0);
+            if (d) drawCalibStep(*d,"ESC PARAM", 3, 4, msg, 0);
             if (elapsed >= ROW_MS) {
                 debugLogger.logf("[ESC PARAM] Row %d = pos %d (%s).",
                     _progParam + 1,
@@ -195,7 +196,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
                     PARAMS[_progParam].opts[_values[_progParam]]);
                 enterNextParam();
             }
-            _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
             return {2048, 0};
         }
 
@@ -204,15 +205,15 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
             char msg[16];
             snprintf(msg, sizeof(msg), "Saving... %ds", secsLeft);
             ScreenDriver* d = getScreenDriver();
-            if (d) d->displayCalibrationStep("ESC PARAM", 4, 4, msg, 4095);
+            if (d) drawCalibStep(*d,"ESC PARAM", 4, 4, msg, 4095);
             if (elapsed >= EXIT_MS) {
                 debugLogger.log("[ESC PARAM] Done. LV protection unchanged. Power cycle ESC.");
                 _state = State::Done;
                 ScreenDriver* d2 = getScreenDriver();
-                if (d2) d2->displayCalibrationResult("ESC PARAM DONE",
+                if (d2) drawCalibResult(*d2,"ESC PARAM DONE",
                     "Rows 1-12 saved.", "LV prot unchanged.", "Power cycle ESC.");
             }
-            _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
             return {2048, 4095};
         }
 
@@ -220,7 +221,7 @@ VehicleData EscParamScreen::update(int rawX, int rawY) {
             break;
     }
 
-    _yWasUp = yUp; _yWasDown = yDown; _xWasRight = xRight;
+    _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
     return {2048, 2048};
 }
 
@@ -247,12 +248,12 @@ void EscParamScreen::showEditor() {
     char header[22], val[20];
     snprintf(header, sizeof(header), "ESC TUNE %d/%d", _paramIdx + 1, PARAM_COUNT);
     snprintf(val, sizeof(val), "> %s <", p.opts[_values[_paramIdx]]);
-    d->displayCalibrationResult(header, p.name, val, "Y:chg  X>:next");
+    drawCalibResult(*d,header, p.name, val, "Y:chg  SW2:next");
 }
 
 void EscParamScreen::showConfirm() {
     ScreenDriver* d = getScreenDriver();
     if (!d) return;
-    d->displayCalibrationResult("PROGRAM ESC?",
-        "Rows 1-12 only.", "LV prot unchanged.", "Y-up:go  X<:cancel");
+    drawCalibResult(*d,"PROGRAM ESC?",
+        "Rows 1-12 only.", "LV prot unchanged.", "Y-up:go  SW1:cancel");
 }

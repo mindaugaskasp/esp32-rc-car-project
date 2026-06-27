@@ -1,5 +1,5 @@
 #include "ServoTrimCalibScreen.h"
-#include "drivers/screen/ScreenDriver.h"
+#include "drivers/screen/ScreenUtils.h"
 #include "drivers/debug/DebugLogger.h"
 #include "config/ControlConfig.h"
 #include <Arduino.h>
@@ -54,7 +54,7 @@ void ServoTrimCalibScreen::showAdjusting(int rawX) {
     if (!d) return;
     char inst[28];
     snprintf(inst, sizeof(inst), "Trim delta: %+d us", trimDeltaMicros());
-    d->displayCalibrationStep("SERVO TRIM CAL", 1, 1, inst, rawX);
+    drawCalibStep(*d,"SERVO TRIM CAL", 1, 1, inst, rawX);
 }
 
 void ServoTrimCalibScreen::showConfirmed() {
@@ -64,7 +64,7 @@ void ServoTrimCalibScreen::showConfirmed() {
     char l1[32], l2[32];
     snprintf(l1, sizeof(l1), "Delta: %+d us", trimDeltaMicros());
     snprintf(l2, sizeof(l2), "New trim: %d us", newTrim);
-    d->displayCalibrationResult("SERVO TRIM DONE", l1, l2, "Check Serial for config");
+    drawCalibResult(*d,"SERVO TRIM DONE", l1, l2, "Check Serial for config");
 }
 
 void ServoTrimCalibScreen::printResult() {

@@ -162,6 +162,8 @@ Boolean flags per subsystem with tagged macros. Flag the build down to zero over
 
 **Function naming is camelCase only** — do not use snake_case for new functions.
 
+**No single-character variable names** — every variable must have a descriptive name that makes its purpose obvious without reading surrounding context. `received`, `packet`, `available` are acceptable; `t`, `d`, `p`, `x` are not. Code must be explicit, clear, and stupid-simple.
+
 ### Enums — always use `enum class`
 Scoped enums prevent name collisions and make intent explicit. Never use unscoped `enum`.
 

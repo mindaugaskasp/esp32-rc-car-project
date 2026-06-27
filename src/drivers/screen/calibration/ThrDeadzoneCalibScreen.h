@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "config/ControlConfig.h"
 #include "drivers/wifi/DataTypes.h"
 
 class ThrDeadzoneCalibScreen {
@@ -12,7 +13,7 @@ public:
 private:
     enum class State : uint8_t { Adjusting, Confirmed };
     State _state = State::Adjusting;
-    int  _deadzone = 75;
+    int  _deadzone = JOY_DEADZONE_Y;
     bool _yWasUp = false;
     unsigned long _yUpStart = 0;
 

@@ -13,7 +13,9 @@ void initServo() {
 }
 
 void setServoAngle(int rawX) {
-    currentServoMicros = computeServoMicros(rawX);
+    int targetMicros = computeServoMicros(rawX);
+    if (abs(targetMicros - currentServoMicros) < SERVO_DEADBAND_MICROS) return;
+    currentServoMicros = targetMicros;
     servo.writeMicroseconds(currentServoMicros);
 }
 

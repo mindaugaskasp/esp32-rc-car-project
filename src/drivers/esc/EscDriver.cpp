@@ -1,23 +1,29 @@
 #include "EscDriver.h"
 #include "EscLogic.h"
 #include <config/Esp32Pins.h>
+#include <config/ControlConfig.h>
 #include "drivers/debug/DebugLogger.h"
 #include <ESP32Servo.h>
 
 Servo esc;
 
+static int currentEscMicros = ESC_NEUTRAL_MICROS;
+
 void initEsc() {
     esc.attach(ESC_PIN, 1000, 2000);
-    esc.writeMicroseconds(ESC_NEUTRAL_MICROS);
+    esc.writeMicroseconds(currentEscMicros);
 }
 
 void setEscNeutral() {
-    esc.writeMicroseconds(ESC_NEUTRAL_MICROS);
-    debugLogger.logEsc(ESC_NEUTRAL_MICROS);
+    currentEscMicros = ESC_NEUTRAL_MICROS;
+    esc.writeMicroseconds(currentEscMicros);
+    debugLogger.logEsc(currentEscMicros);
 }
 
 void updateEscSpeed(int rawY) {
     int targetSpeed = computeEscMicros(rawY);
-    esc.writeMicroseconds(targetSpeed);
-    debugLogger.logEsc(targetSpeed);
+    if (abs(targetSpeed - currentEscMicros) < ESC_DEADBAND_MICROS) return;
+    currentEscMicros = targetSpeed;
+    esc.writeMicroseconds(currentEscMicros);
+    debugLogger.logEsc(currentEscMicros);
 }

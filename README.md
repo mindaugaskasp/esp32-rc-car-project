@@ -171,15 +171,23 @@ Motor RPM is measured on the receiver by a **KY-003 / 3144 unipolar Hall effect 
 
 ### Wiring
 
+The sensor is rated **4.5 V – 24 V minimum**. Power it from the 5 V rail, not 3.3 V — below 4.5 V the output is unstable and produces false pulses. Because the signal pin pulls to ~5 V when no magnet is detected, a simple voltage divider is required to protect the ESP32's 3.3 V GPIO.
+
 ```
-Hall sensor   →   ESP32 receiver
-──────────────────────────────────
-VCC           →   3.3 V   (do NOT use 5 V on the ESP32 GPIO)
-GND           →   GND
-S (signal)    →   GPIO 25
+                          5V (BEC)
+                            │
+                          [VCC]──── sensor
+                          [GND]──── GND
+                          [ S ]──┬──── 10 kΩ ──── GPIO 25
+                                 │
+                               20 kΩ
+                                 │
+                                GND
+
+5 V × 20 kΩ / (10 kΩ + 20 kΩ) = 3.33 V  →  safe for ESP32
 ```
 
-The module has a built-in pull-up resistor and indicator LED — no external components needed. The output is **active-low** (HIGH = no magnet, LOW = magnet detected).
+The module has a built-in pull-up to VCC and an indicator LED. The output is **active-low** (HIGH ≈ 5 V when no magnet, LOW ≈ 0 V when magnet detected).
 
 ### Sensor orientation
 

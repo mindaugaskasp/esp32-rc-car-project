@@ -3,192 +3,100 @@
 #include "Sh1106ScreenDriver.h"
 #include "config/Esp32Pins.h"
 
-// SH1106 128x64 I2C inicijavimas
-// U8G2_R0 reiškia jokio pasukimo, paskutiniai skaičiai - SDA ir SCL pinai
+// SH1106 128x64 I2C — U8G2_R0 = no rotation; last two args are SCL and SDA pins.
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, SCREEN_SCL_PIN, SCREEN_SDA_PIN);
 
-static const int JOYSTICK_CENTER_RAW = 2048;
+// ── Font mapping ──────────────────────────────────────────────────────────────
+static const uint8_t* toU8g2Font(ScreenFont f) {
+    switch (f) {
+        case ScreenFont::Tiny:   return u8g2_font_4x6_tf;
+        case ScreenFont::Small:  return u8g2_font_5x7_tf;
+        case ScreenFont::Medium: return u8g2_font_6x10_tf;
+        case ScreenFont::Large:  return u8g2_font_8x13_tf;
+    }
+    return u8g2_font_5x7_tf;
+}
 
-// Draws text normally if it fits, otherwise scrolls it left (marquee).
-// 1 s pause at start, then 1 px per 50 ms.
-static void drawStr(U8G2_SH1106_128X64_NONAME_F_HW_I2C& g, int y, const char* text) {
-    if (!text || !*text) return;
-    int w = (int)g.getStrWidth(text);
-    if (w <= 127) {
-        g.drawStr(0, y, text);
+// ── Primitives ────────────────────────────────────────────────────────────────
+
+void Sh1106ScreenDriver::init() {
+    // I2C bus recovery: if power was cut during a previous transmission the
+    // display may be holding SDA low, blocking all further communication.
+    // Fix: manually clock SCL 9 times (one full byte + ACK slot) so the stuck
+    // device finishes its byte and releases SDA, then issue a STOP condition.
+    // This is the standard recovery procedure from NXP application note AN10116.
+    pinMode(SCREEN_SDA_PIN, INPUT_PULLUP);   // let SDA float — don't drive it yet
+    pinMode(SCREEN_SCL_PIN, OUTPUT);
+    for (int clockPulse = 0; clockPulse < 9; clockPulse++) {
+        digitalWrite(SCREEN_SCL_PIN, LOW);  delayMicroseconds(5);
+        digitalWrite(SCREEN_SCL_PIN, HIGH); delayMicroseconds(5);
+    }
+    // Issue a STOP condition: SDA goes HIGH while SCL is HIGH.
+    pinMode(SCREEN_SDA_PIN, OUTPUT);
+    digitalWrite(SCREEN_SDA_PIN, LOW);
+    delayMicroseconds(5);
+    digitalWrite(SCREEN_SCL_PIN, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(SCREEN_SDA_PIN, HIGH);
+    delayMicroseconds(5);
+    // Release both pins so U8g2 / Wire can take them over as hardware I2C.
+    pinMode(SCREEN_SCL_PIN, INPUT);
+    pinMode(SCREEN_SDA_PIN, INPUT);
+
+    u8g2.begin();
+}
+
+void Sh1106ScreenDriver::clear() {
+    u8g2.clearBuffer();
+}
+
+void Sh1106ScreenDriver::flush() {
+    u8g2.sendBuffer();
+}
+
+void Sh1106ScreenDriver::font(ScreenFont f) {
+    u8g2.setFont(toU8g2Font(f));
+}
+
+void Sh1106ScreenDriver::text(int x, int y, const char* str) {
+    if (str) u8g2.drawStr(x, y, str);
+}
+
+// Draws text normally if it fits within the display width; otherwise scrolls
+// it left (marquee): 1 s pause at start, then 1 px per 50 ms.
+void Sh1106ScreenDriver::scrollText(int y, const char* str) {
+    if (!str || !*str) return;
+    int w = (int)u8g2.getStrWidth(str);
+    if (w <= W - 1) {
+        u8g2.drawStr(0, y, str);
         return;
     }
-    const unsigned long STEP_MS    = 50UL;
-    const int           PAUSE_STEPS = 20;    // 1 s pause before scrolling
-    const int           GAP_PX     = 20;    // silent gap between loops
-    int scrollSteps = w - 127 + GAP_PX;
+    const unsigned long STEP_MS     = 50UL;
+    const int           PAUSE_STEPS = 20;   // 1 s pause before scrolling
+    const int           GAP_PX      = 20;   // silent gap between loops
+    int scrollSteps = w - (W - 1) + GAP_PX;
     int totalSteps  = PAUSE_STEPS + scrollSteps;
     int phase       = (int)((millis() / STEP_MS) % (unsigned long)totalSteps);
     int x           = (phase < PAUSE_STEPS) ? 0 : -(phase - PAUSE_STEPS);
-    g.drawStr(x, y, text);
+    u8g2.drawStr(x, y, str);
 }
 
-void Sh1106ScreenDriver::init() {
-    u8g2.begin();
-    displayStartup("Initializing...");
+int Sh1106ScreenDriver::textW(const char* str) {
+    return str ? (int)u8g2.getStrWidth(str) : 0;
 }
 
-void Sh1106ScreenDriver::displayStartup(const char* message) {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_6x10_tf);
-    u8g2.drawStr(0, 10, message);
-    u8g2.sendBuffer();
+void Sh1106ScreenDriver::hline(int x, int y, int w) {
+    u8g2.drawHLine(x, y, w);
 }
 
-void Sh1106ScreenDriver::displayConnectionEstablished() {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_6x10_tf);
-    u8g2.drawStr(0, 10, "Starting remote");
-    u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(0, 62, "Connection established");
-    u8g2.sendBuffer();
+void Sh1106ScreenDriver::vline(int x, int y, int h) {
+    u8g2.drawVLine(x, y, h);
 }
 
-void Sh1106ScreenDriver::displayDashboard(float carBatteryVoltage, float remoteBatteryVoltage, int speedRpm, float speedKmh) {
-    u8g2.clearBuffer();
-
-    u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(0, 7, "CAR");
-    u8g2.drawStr(0, 16, " __");
-    u8g2.drawStr(0, 24, "/_o\\");
-
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%.2fV", carBatteryVoltage);
-    u8g2.drawStr(0, 34, buf);
-
-    u8g2.drawStr(94, 7, "REMOTE");
-    u8g2.drawStr(106, 16, "[=]");
-    snprintf(buf, sizeof(buf), "%.2fV", remoteBatteryVoltage);
-    u8g2.drawStr(94, 26, buf);
-
-    u8g2.setFont(u8g2_font_6x10_tf);
-    snprintf(buf, sizeof(buf), "%d RPM", speedRpm);
-    int rpmWidth = u8g2.getStrWidth(buf);
-    u8g2.drawStr((128 - rpmWidth) / 2, 45, buf);
-
-    snprintf(buf, sizeof(buf), "%.1f km/h", speedKmh);
-    int speedWidth = u8g2.getStrWidth(buf);
-    u8g2.drawStr((128 - speedWidth) / 2, 60, buf);
-
-    u8g2.sendBuffer();
+void Sh1106ScreenDriver::box(int x, int y, int w, int h) {
+    u8g2.drawBox(x, y, w, h);
 }
 
-void Sh1106ScreenDriver::displayTelemetry(float batteryVoltage, int speedRpm) {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_6x10_tf);
-    u8g2.drawStr(0, 10, "RC Car Telemetry");
-
-    char buf[32];
-    snprintf(buf, sizeof(buf), "Battery: %.2fV", batteryVoltage);
-    u8g2.drawStr(0, 30, buf);
-
-    snprintf(buf, sizeof(buf), "Speed: %d RPM", speedRpm);
-    u8g2.drawStr(0, 45, buf);
-
-    u8g2.sendBuffer();
-}
-
-void Sh1106ScreenDriver::displayDebugJoystick(int joystickX, int joystickY) {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(0, 7, "DEBUG JOYSTICK TX");
-
-    char buf[32];
-    snprintf(buf, sizeof(buf), "X raw: %d", joystickX);
-    u8g2.drawStr(0, 17, buf);
-
-    snprintf(buf, sizeof(buf), "Y raw: %d", joystickY);
-    u8g2.drawStr(0, 25, buf);
-
-    snprintf(buf, sizeof(buf), "X delta: %+d", joystickX - JOYSTICK_CENTER_RAW);
-    u8g2.drawStr(0, 35, buf);
-
-    snprintf(buf, sizeof(buf), "Y delta: %+d", joystickY - JOYSTICK_CENTER_RAW);
-    u8g2.drawStr(0, 43, buf);
-
-    snprintf(buf, sizeof(buf), "Sent: %lu ms", millis());
-    u8g2.drawStr(0, 55, buf);
-
-    u8g2.sendBuffer();
-}
-
-void Sh1106ScreenDriver::displayCalibrationStep(const char* title, uint8_t step, uint8_t totalSteps, const char* instruction, int barValue) {
-    u8g2.clearBuffer();
-
-    u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(0, 7, title);
-
-    char stepBuf[14];
-    snprintf(stepBuf, sizeof(stepBuf), "Step %d of %d", step, totalSteps);
-    u8g2.setFont(u8g2_font_6x10_tf);
-    u8g2.drawStr(0, 20, stepBuf);
-
-    u8g2.setFont(u8g2_font_5x7_tf);
-    const char* nl = strchr(instruction, '\n');
-    if (nl) {
-        // Two-line instruction: skip "Raw:" label to keep bar visible
-        char line1[32];
-        int len = (int)(nl - instruction);
-        if (len > 31) len = 31;
-        memcpy(line1, instruction, len);
-        line1[len] = '\0';
-        drawStr(u8g2, 32, line1);
-        drawStr(u8g2, 41, nl + 1);
-        if (barValue >= 0) {
-            int barWidth = (int)((long)constrain(barValue, 0, 4095) * 126 / 4095);
-            u8g2.drawFrame(0, 55, 128, 8);
-            if (barWidth > 0) u8g2.drawBox(1, 56, barWidth, 6);
-        }
-    } else {
-        drawStr(u8g2, 32, instruction);
-        if (barValue >= 0) {
-            char rawBuf[16];
-            snprintf(rawBuf, sizeof(rawBuf), "Raw: %d", barValue);
-            drawStr(u8g2, 44, rawBuf);
-            int barWidth = (int)((long)constrain(barValue, 0, 4095) * 126 / 4095);
-            u8g2.drawFrame(0, 55, 128, 8);
-            if (barWidth > 0) u8g2.drawBox(1, 56, barWidth, 6);
-        }
-    }
-
-    u8g2.sendBuffer();
-}
-
-void Sh1106ScreenDriver::displayCalibrationResult(const char* title, const char* line1, const char* line2, const char* line3) {
-    u8g2.clearBuffer();
-
-    u8g2.setFont(u8g2_font_6x10_tf);
-    u8g2.drawStr(0, 12, title);
-
-    u8g2.setFont(u8g2_font_5x7_tf);
-    if (line1) drawStr(u8g2, 27, line1);
-    if (line2) drawStr(u8g2, 38, line2);
-    if (line3) drawStr(u8g2, 50, line3);
-
-    u8g2.sendBuffer();
-}
-
-void Sh1106ScreenDriver::displayDebugTelemetry(float batteryVoltage, int speedRpm) {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(0, 7, "DEBUG TELEMETRY RX");
-
-    char buf[32];
-    snprintf(buf, sizeof(buf), "Battery: %.2fV", batteryVoltage);
-    u8g2.drawStr(0, 17, buf);
-
-    snprintf(buf, sizeof(buf), "Speed: %d RPM", speedRpm);
-    u8g2.drawStr(0, 25, buf);
-
-    snprintf(buf, sizeof(buf), "RX: %lu ms", millis());
-    u8g2.drawStr(0, 35, buf);
-
-    u8g2.drawStr(0, 45, "Packet: new hash");
-
-    u8g2.sendBuffer();
+void Sh1106ScreenDriver::frame(int x, int y, int w, int h) {
+    u8g2.drawFrame(x, y, w, h);
 }

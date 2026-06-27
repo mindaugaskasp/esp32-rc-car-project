@@ -22,12 +22,11 @@ private:
     int  _leftRaw       = 0;
     int  _rightRaw      = 0;
 
-    bool _yWasUp    = false;
-    bool _yWasDown  = false;
-    bool _xWasRight = false;
-    unsigned long _yUpStart    = 0;
-    unsigned long _yDownStart  = 0;
-    unsigned long _xRightStart = 0;
+    bool _yWasUp   = false;
+    bool _yWasDown = false;
+    bool _sw1Was   = false;  // JOY1_SW — confirm trim done, proceed
+    unsigned long _yUpStart   = 0;
+    unsigned long _yDownStart = 0;
 
     static const int          STEP_RAW    = 10;
     static const int          MAX_OFFSET  = 400;
