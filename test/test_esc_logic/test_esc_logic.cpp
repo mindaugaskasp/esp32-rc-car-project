@@ -40,6 +40,28 @@ void test_boundary_2200_not_in_deadzone() {
     TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(2200));
 }
 
+void test_neutral_band_edges_track_named_constants() {
+    // The neutral band is (ESC_NEUTRAL_JOY_LOW, ESC_NEUTRAL_JOY_HIGH), open interval.
+    // Just inside each edge -> neutral; the edges themselves -> not neutral.
+    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_LOW + 1));
+    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_HIGH - 1));
+    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_LOW));
+    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_HIGH));
+}
+
+// --- Bidirectional mapping: below-center is reverse, above-center is forward ---
+
+void test_below_center_is_reverse() {
+    // Anything below the neutral band (and outside it) maps below neutral (braking/reverse).
+    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_LOW));
+    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(500));
+}
+
+void test_above_center_is_forward() {
+    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_HIGH));
+    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(3500));
+}
+
 // --- Clamping ---
 
 void test_negative_input_clamped_to_zero() {
@@ -83,6 +105,9 @@ int main(int argc, char **argv) {
     RUN_TEST(test_deadzone_upper_edge_is_neutral);
     RUN_TEST(test_boundary_1900_not_in_deadzone);
     RUN_TEST(test_boundary_2200_not_in_deadzone);
+    RUN_TEST(test_neutral_band_edges_track_named_constants);
+    RUN_TEST(test_below_center_is_reverse);
+    RUN_TEST(test_above_center_is_forward);
     RUN_TEST(test_negative_input_clamped_to_zero);
     RUN_TEST(test_over_range_input_clamped_to_max);
     RUN_TEST(test_known_value_below_deadzone);

@@ -28,6 +28,12 @@ void DebugLogger::logJoystick(int x, int y) {
     if (!DEBUG_JOYSTICK_TO_SERIAL) {
         return;
     }
+    static unsigned long lastLogTime = 0;
+    unsigned long now = millis();
+    if (now - lastLogTime < DEBUG_LOG_MIN_INTERVAL_MS) {
+        return;
+    }
+    lastLogTime = now;
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "[JOY]: X=%d Y=%d", x, y);
     logSerial(buffer);

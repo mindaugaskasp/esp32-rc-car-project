@@ -1,5 +1,10 @@
 #pragma once
 
+// Assumed ADC center for both joystick axes when at rest. Shared by the servo
+// map, ESC neutral deadzone, dashboard delta display, and the ping/probe
+// "safe neutral" packets — one canonical value instead of several copies.
+#define JOYSTICK_CENTER_RAW 2048
+
 // Per-axis joystick deadzone in ADC units (0-4095).
 // X (steering): use a larger value — steering drift causes visible servo jitter.
 // Y (throttle): smaller keeps throttle response quick from a standing start.

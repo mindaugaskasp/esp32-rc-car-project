@@ -4,39 +4,75 @@ This document establishes the coding patterns and architectural standards for th
 
 ## Project Structure
 
+The source tree is organized by **layer**, not by board. Each top-level directory is one
+altitude of abstraction; board membership (transmitter vs. receiver) is expressed only in
+`build_src_filter`, never by folder.
+
+| Layer | Directory | Rule |
+|-------|-----------|------|
+| **L0 — Hardware drivers** | `drivers/` | Touches a peripheral directly (ADC, PWM, I²C, radio, Serial). Nothing higher-level lives here. |
+| **L1 — Comm / link** | `comm/` | Messaging protocols built *on top of* the radio driver: framing, channel handshake, dedup, watchdog. |
+| **L2 — UI** | `ui/` | Screens, menus, on-screen views. Draws via the display driver; owns no hardware. |
+| **L2 — App** | `app/` | Top-level feature modes that orchestrate L0/L1/UI. |
+
 ```
 src/
-├── main_transmitter.cpp          # Transmitter entry point
-├── main_receiver.cpp             # Receiver entry point
+├── main_transmitter.cpp          # Transmitter entry point — TxMode state machine + setup()/loop() only
+├── main_receiver.cpp             # Receiver entry point — setup()/loop() only
 ├── config/
 │   ├── ControlConfig.h           # Joystick calibration, servo/ESC tuning constants
 │   ├── DebugConfig.h             # Per-subsystem debug flags and macros
-│   ├── Esp32Pins.h               # GPIO pin assignments
+│   ├── Esp32Pins.h               # Includes the board-specific pin file below by IS_TRANSMITTER/IS_RECEIVER
+│   ├── Esp32PinsTransmitter.h    # Transmitter GPIO pin assignments
+│   ├── Esp32PinsReceiver.h       # Receiver GPIO pin assignments
 │   └── WifiConfig.h              # MAC addresses, ESP-NOW config
-└── drivers/
-    ├── controls/                 # Joystick ADC sampling
-    ├── debug/                    # Serial + screen logging (DebugLogger)
-    ├── esc/
-    │   ├── EscDriver.h/cpp       # ESC PWM output
-    │   ├── EscLogic.h            # Pure speed computation — no Arduino dep, testable
-    │   └── EscCalibration.h/cpp  # Throttle-range calibration sequence
-    ├── screen/
-    │   ├── Screen.h/cpp          # Display abstraction
-    │   ├── ScreenDriver.h/cpp    # Driver interface
-    │   ├── ScreenDriverFactory   # Constructs the concrete driver
-    │   ├── protocols/sh1106/     # SH1106 OLED implementation
-    │   └── calibration/          # On-screen calibration UI and CalibrationFlow
-    ├── servo/
-    │   ├── ServoDriver.h/cpp     # Servo PWM output with smoothing
-    │   └── ServoLogic.h          # Pure angle computation — no Arduino dep, testable
-    └── wifi/
-        ├── EspNowDriver.h/cpp    # ESP-NOW init, peer management, send/receive
-        └── DataTypes.h           # VehicleData / TelemetryData structs
+│
+├── drivers/                      # L0 — ONLY code that touches a peripheral directly
+│   ├── controls/                 # Joystick ADC sampling + buttons
+│   ├── debug/                    # Serial logging (DebugLogger) + Esp32SysInfo
+│   ├── radio/
+│   │   └── EspNowDriver.h/cpp    # ESP-NOW init, peer management, raw send/receive
+│   ├── display/
+│   │   ├── ScreenDriver.h/cpp    # Raw panel primitive interface (no layout)
+│   │   ├── ScreenDriverFactory   # Constructs the concrete driver
+│   │   └── protocols/sh1106/     # SH1106 OLED implementation
+│   ├── esc/
+│   │   ├── EscDriver.h/cpp       # ESC PWM output
+│   │   └── EscLogic.h            # Pure speed computation — no Arduino dep, testable
+│   ├── servo/
+│   │   ├── ServoDriver.h/cpp     # Servo PWM output with smoothing
+│   │   └── ServoLogic.h          # Pure angle computation — no Arduino dep, testable
+│   └── hall/                     # Hall-effect speed sensor (receiver)
+│
+├── comm/                         # L1 — messaging built on the radio driver
+│   ├── DataTypes.h               # VehicleData / TelemetryData wire structs (shared contract)
+│   ├── ChannelScanner.h/cpp      # Startup 2.4GHz congestion scan, picks the least busy channel   [both]
+│   ├── ChannelAdvertiser.h/cpp   # Broadcasts/receives the chosen channel so both boards sync      [both]
+│   ├── ChannelSync.h/cpp         # TX-side channel handshake orchestration                          [tx]
+│   ├── TelemetryLink.h/cpp       # Inbound telemetry receipt, dedup, RTT accumulators               [tx]
+│   ├── JoystickSender.h/cpp      # Outgoing joystick send-decision logic                            [tx]
+│   └── VehicleCommandReceiver.h/cpp  # Inbound command receipt, servo/ESC dispatch, loss watchdog   [rx]
+│
+├── ui/                           # L2 — screens & menus (transmitter)
+│   ├── Screen.h/cpp              # High-level draw API (DashboardData, showDashboard, …)
+│   ├── ScreenUtils.h/cpp         # Shared drawing helpers
+│   ├── ModeSelectMenu.h/cpp      # Top-level mode menu UI + shared "open menu" gesture
+│   ├── DebugScreen.h/cpp         # Debug Info mode display
+│   ├── WifiPingScreen.h/cpp      # WiFi Ping mode's stat display
+│   ├── WifiScanScreen.h/cpp      # Startup channel-scan progress/result display
+│   └── calibration/              # On-screen calibration UI and CalibrationFlow
+│
+└── app/                          # L2 — top-level feature modes (transmitter)
+    ├── DashboardMode.h/cpp       # Dashboard mode: connection state, link-quality indicator
+    ├── DebugMode.h/cpp           # Debug Info mode
+    └── WifiPingMode.h/cpp        # WiFi Ping mode: fixed-rate ping + RTT/loss/jitter stats
 
 test/
 ├── test_esc_logic/               # Unity tests — ESC speed mapping
 └── test_servo_logic/             # Unity tests — servo angle mapping
 ```
+
+Both `main_*.cpp` files are intentionally thin: they own only the top-level mode state machine (transmitter) or the `setup()`/`loop()` wiring (receiver). Per-mode behavior lives in `app/`, ESP-NOW receipt/send-decision logic lives in `comm/`, and views live in `ui/`. When a main file starts accumulating non-trivial logic again, extract it into a new class in the layer that matches its altitude (`comm/`, `ui/`, or `app/`) rather than letting it grow. Keep `drivers/` for peripheral-touching code only — if a new class merely *uses* a driver, it belongs in `comm/`, `ui/`, or `app/`, not `drivers/`.
 
 ---
 
@@ -158,7 +194,7 @@ Boolean flags per subsystem with tagged macros. Flag the build down to zero over
 | Private / static variables | camelCase | `currentServoMicros`, `pendingPacket` |
 | Enum values | PascalCase | `EscOperationMode::PositiveRotationBandBrake` |
 | Header files | PascalCase | `ServoDriver.h`, `EscLogic.h` |
-| Implementation files | PascalCase | `ServoDriver.cpp`, `EscCalibration.cpp` |
+| Implementation files | PascalCase | `ServoDriver.cpp`, `EscDriver.cpp` |
 
 **Function naming is camelCase only** — do not use snake_case for new functions.
 
@@ -265,7 +301,7 @@ lib_deps =
     madhephaestus/ESP32Servo @ ^3.0.5
     olikraus/U8g2 @ ^2.35.0
 build_flags = -D IS_TRANSMITTER=1 -D BAUD_RATE=115200 -Isrc
-build_src_filter = +<main_transmitter.cpp> +<drivers/> +<config/> -<drivers/esc/> -<drivers/servo/>
+build_src_filter = +<main_transmitter.cpp> +<config/> +<drivers/> +<comm/> +<ui/> +<app/> -<drivers/esc/> -<drivers/servo/> -<drivers/hall/> -<comm/VehicleCommandReceiver.cpp>
 
 [env:native]
 platform = native
@@ -333,26 +369,65 @@ Only pure logic is testable natively. The rule is:
 10. Write tests for any `*Logic.h` functions
 11. **Update `build_src_filter` in `platformio.ini`** — see rule below
 
-### `build_src_filter` rule — MANDATORY for every new driver
+### `build_src_filter` rule — MANDATORY for every new driver or class
 
-Both `transmitter` and `receiver` environments use `+<drivers/>`, which means **every file in `src/drivers/` compiles for both targets by default**. Any driver that is hardware-specific to one board MUST be excluded from the other environment or the build will fail.
+The transmitter pulls in `+<drivers/> +<comm/> +<ui/> +<app/>`; the receiver (headless)
+pulls in only `+<drivers/> +<comm/>`. So `ui/` and `app/` are transmitter-only by
+construction, but any **board-specific file inside a shared layer** (`drivers/` or `comm/`)
+MUST be excluded from the board that doesn't use it, or the build will fail.
 
-| Driver is used by | Action required |
-|-------------------|-----------------|
-| Both boards | Nothing — already included via `+<drivers/>` |
-| Receiver only | Add `-<drivers/category/>` to the transmitter `build_src_filter` |
-| Transmitter only | Add `-<drivers/category/>` to the receiver `build_src_filter` |
+| New file is used by | Action required |
+|---------------------|-----------------|
+| Both boards | Nothing — already included via its layer |
+| Transmitter only, and it lives in `ui/` or `app/` | Nothing — the receiver never includes those layers |
+| Receiver only (in `drivers/` or `comm/`) | Add `-<path>` to the **transmitter** `build_src_filter` |
+| Transmitter only (in `drivers/` or `comm/`) | Add `-<path>` to the **receiver** `build_src_filter` |
 
-**Current exclusions (update this table when adding new drivers):**
+Excludes can target a whole directory (`-<drivers/esc/>`) or a single file
+(`-<comm/JoystickSender.cpp>`) — use a file-level exclude when a board-specific file shares a
+directory with cross-board files, as in `comm/`.
 
-| Directory | Excluded from |
-|-----------|--------------|
+**Current exclusions (update this table when adding files):**
+
+| Path | Excluded from |
+|------|--------------|
 | `drivers/esc/` | transmitter |
 | `drivers/servo/` | transmitter |
 | `drivers/hall/` | transmitter |
-| `drivers/screen/` | receiver |
+| `comm/VehicleCommandReceiver.cpp` | transmitter |
+| `drivers/display/` | receiver |
+| `comm/ChannelSync.cpp` | receiver |
+| `comm/TelemetryLink.cpp` | receiver |
+| `comm/JoystickSender.cpp` | receiver |
+| `ui/` (whole layer) | receiver — not included at all |
+| `app/` (whole layer) | receiver — not included at all |
 
-Forgetting this step causes "not declared in this scope" or linker errors in the environment that shouldn't compile that driver.
+Forgetting this step causes "not declared in this scope" or linker errors in the environment that shouldn't compile that file.
+
+---
+
+## Adding a New `comm/` / `ui/` / `app/` Class
+
+Use this when the new code merely *uses* drivers rather than touching hardware — link/protocol
+logic, a screen/view, or a top-level mode. **If it touches a peripheral directly, it is a
+driver — follow "Adding a New Driver" instead.** Pick the layer by altitude:
+
+| It is… | Layer | Directory |
+|--------|-------|-----------|
+| Messaging built on the radio (framing, handshake, dedup, send/receive, watchdog) | L1 | `comm/` |
+| A screen, menu, or on-screen view | L2 | `ui/` |
+| A top-level feature mode that orchestrates drivers/comm/ui | L2 | `app/` |
+
+Steps:
+1. Create `ClassName.h` — `#pragma once`, public API only; the `extern` singleton instance if used that way (see existing classes).
+2. If it contains non-trivial pure computation, extract it into a companion `ClassNameLogic.h` (no Arduino dep) and unit-test it — the `*Logic.h` pattern is layer-independent.
+3. Create `ClassName.cpp` — own header first, then project headers by full path (`"comm/…"`, `"ui/…"`, `"drivers/category/…"`, `"config/…"`), then external libraries. All internal state `static`.
+4. Reference it from its caller (a `main_*.cpp`, an `app/` mode, or another class) by **full path** — `#include "comm/ClassName.h"`, never a bare relative include across layers.
+5. Update `build_src_filter` **only if the file is board-specific and lives in a shared layer** (`comm/`): add a file-level `-<comm/ClassName.cpp>` to the board that doesn't use it. Files in `ui/` and `app/` need nothing — those layers are transmitter-only already. See the exclusions table above.
+
+New `comm/`, `ui/`, or `app/` **directories** are rare — prefer adding files to the existing
+layer. If you do add a new top-level layer, wire it into both `build_src_filter` lines and add
+it to the layer table under "Project Structure".
 
 ---
 
@@ -361,8 +436,11 @@ Forgetting this step causes "not declared in this scope" or linker errors in the
 ```sh
 make help           # show all targets
 make test           # run unit tests (no hardware needed)
-make build-tx       # compile transmitter
-make build-rx       # compile receiver
+make check          # static analysis (cppcheck) on both firmwares
+make check-tx       # static analysis on transmitter only
+make check-rx       # static analysis on receiver only
+make build-tx       # static-check, then compile transmitter
+make build-rx       # static-check, then compile receiver
 make ports          # list connected USB serial devices
 make set-tx PORT=… # save transmitter port (persisted in .ports, gitignored)
 make set-rx PORT=… # save receiver port
@@ -373,6 +451,18 @@ make monitor-rx     # serial monitor at receiver baud rate
 ```
 
 `.ports` stores per-machine port assignments and is gitignored. One-off overrides still work: `make upload-tx PORT=/dev/cu.usbserial-xxx`.
+
+### Static analysis
+
+`make build-tx`, `make build-rx`, and the `upload-*` targets each run `pio check` (cppcheck,
+bundled with PlatformIO — no separate install) **before** compiling, so no firmware is built
+without passing the quality gate. Config lives in each env's `check_*` keys in `platformio.ini`.
+Only `src/` is analyzed (library deps under `.pio/` are suppressed). The build halts on any
+defect at or above `FAIL_ON` severity (default `medium`) — **no medium- or high-severity
+defects may be present for a build to succeed; keep the tree clean of them.** Low-severity
+findings are reported but do not block; override the floor per-invocation, e.g.
+`make build-tx FAIL_ON=low`. Formatting is governed by `.clang-format` (run
+`clang-format -i` or enable format-on-save in your editor).
 
 ---
 

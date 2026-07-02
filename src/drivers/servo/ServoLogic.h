@@ -1,7 +1,7 @@
 #pragma once
 #include "config/ControlConfig.h"
 
-static const int SERVO_JOYSTICK_CENTER_RAW = 2048;
+static const int SERVO_JOYSTICK_CENTER_RAW = JOYSTICK_CENTER_RAW;
 
 // Computes servo PWM pulse width (µs) for a raw 12-bit joystick X input.
 // Matches Arduino map() / constrain() / abs() integer arithmetic — no Arduino.h needed.

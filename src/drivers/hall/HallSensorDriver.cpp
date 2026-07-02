@@ -1,4 +1,5 @@
 #include "HallSensorDriver.h"
+#include "HallLogic.h"
 #include "config/Esp32Pins.h"
 #include "config/ControlConfig.h"
 #include <Arduino.h>
@@ -43,13 +44,7 @@ void updateHallSensor() {
 
     _lastCalcTime = now;
 
-    // RPM = (pulses / pulses_per_rev) / (elapsed_ms / 60 000)
-    //     = pulses * 60 000 / (pulses_per_rev * elapsed_ms)
-    if (count < HALL_MIN_PULSES_FOR_RPM) {
-        _currentRpm = 0;
-    } else {
-        _currentRpm = (int)(count * 60000UL / ((uint32_t)HALL_PULSES_PER_REV * elapsed));
-    }
+    _currentRpm = computeMotorRpm(count, elapsed);
 }
 
 int getMotorRpm() {

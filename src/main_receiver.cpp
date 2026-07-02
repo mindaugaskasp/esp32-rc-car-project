@@ -5,96 +5,17 @@
 #include "drivers/servo/ServoDriver.h"
 #include "drivers/esc/EscDriver.h"
 #include "drivers/hall/HallSensorDriver.h"
-#include "drivers/wifi/EspNowDriver.h"
-#include <esp_now.h>
+#include "drivers/radio/EspNowDriver.h"
+#include "comm/ChannelScanner.h"
+#include "comm/ChannelAdvertiser.h"
+#include "comm/VehicleCommandReceiver.h"
 
-static unsigned long lastPacketTime = 0;
-static bool escResetDueToLoss = false;
-static const unsigned long PACKET_LOSS_TIMEOUT_MS = 500;
-
-struct PendingPacket {
-    uint8_t mac[6];
-    uint8_t data[sizeof(VehicleData)];
-    int len;
-};
-
-static portMUX_TYPE pendingPacketMux = portMUX_INITIALIZER_UNLOCKED;
-static PendingPacket pendingPacket;
-static volatile bool pendingPacketAvailable = false;
-
-void onDataReceive(const uint8_t *mac, const uint8_t *incomingData, int len) {
-    unsigned long receivedAt = millis();
-    size_t copyLen = 0;
-    if (len > 0) {
-        copyLen = len < static_cast<int>(sizeof(pendingPacket.data))
-            ? len
-            : sizeof(pendingPacket.data);
-    }
-
-    portENTER_CRITICAL(&pendingPacketMux);
-    memcpy(pendingPacket.mac, mac, sizeof(pendingPacket.mac));
-    if (copyLen > 0) {
-        memcpy(pendingPacket.data, incomingData, copyLen);
-    }
-    pendingPacket.len = len;
-    pendingPacketAvailable = true;
-    lastPacketTime = receivedAt;
-    escResetDueToLoss = false;
-    portEXIT_CRITICAL(&pendingPacketMux);
-}
-
-static void handleVehiclePacket(const uint8_t *mac, const VehicleData &data) {
-    setServoAngle(data.servoPos);
-    updateEscSpeed(data.escSpeed);
-    
-    TelemetryData telemetry;
-    telemetry.batteryVoltage = 7.4f; // TODO: replace with ADC voltage divider reading
-    telemetry.speedRpm = getMotorRpm();
-    telemetry.echoTimestampMs = data.txTimestampMs;
-    
-    debugLogger.logf("Received data: servo=%d esc=%d", data.servoPos, data.escSpeed);
-
-    // Send back to the sender's MAC address
-    esp_err_t result = esp_now_send(mac, (uint8_t *)&telemetry, sizeof(telemetry));
-    if (result == ESP_OK) {
-        debugLogger.log("Telemetry packet sent back to sender");
-    } else {
-        debugLogger.logf("Telemetry send failed: %d", result);
-    }
-}
-
-static void processPendingPacket() {
-    PendingPacket packet;
-    bool packetAvailable;
-
-    portENTER_CRITICAL(&pendingPacketMux);
-    packetAvailable = pendingPacketAvailable;
-    if (packetAvailable) {
-        memcpy(&packet, &pendingPacket, sizeof(packet));
-        pendingPacketAvailable = false;
-    }
-    portEXIT_CRITICAL(&pendingPacketMux);
-
-    if (!packetAvailable) {
-        return;
-    }
-
-    char peerMac[18];
-    snprintf(peerMac, sizeof(peerMac), "%02X:%02X:%02X:%02X:%02X:%02X",
-             packet.mac[0], packet.mac[1], packet.mac[2], packet.mac[3], packet.mac[4], packet.mac[5]);
-    debugLogger.logf("Packet received from: %s, len=%d", peerMac, packet.len);
-
-    const char* packetType = (packet.len == sizeof(VehicleData)) ? "VehicleData" : "Unknown";
-    debugLogger.logf("Packet type: %s", packetType);
-
-    if (packet.len != sizeof(VehicleData)) {
-        return;
-    }
-
-    VehicleData data;
-    memcpy(&data, packet.data, sizeof(data));
-    handleVehiclePacket(packet.mac, data);
-}
+// Worst-case transmitter startup is a multi-second channel scan followed by an
+// 8s broadcast window (see CHANNEL_BROADCAST_MS in main_transmitter.cpp). This
+// timeout must comfortably exceed that so the two boots have real overlap even
+// if they aren't powered on at exactly the same moment.
+static const unsigned long CHANNEL_SYNC_TIMEOUT_MS = 20000;
+static const uint8_t       CHANNEL_SYNC_FALLBACK    = 6;
 
 void setup() {
     Serial.begin(BAUD_RATE);
@@ -106,29 +27,19 @@ void setup() {
     initEsc();
     initHallSensor();
     debugLogger.log("Servo, ESC, and Hall sensor initialized");
-    
+
     initEspNow();
+
+    // Wait for a channel advertisement from our transmitter, fall back to CHANNEL_SYNC_FALLBACK
+    uint8_t channel = receiveChannelAdvert(TRANSMITTER_MAC, CHANNEL_SYNC_TIMEOUT_MS, CHANNEL_SYNC_FALLBACK);
+    applyWifiChannel(channel);
+
     addPeer(TRANSMITTER_MAC);
-    initEspNowReceiver();
+    vehicleCommandReceiver.begin();
     debugLogger.log("Receiver ready and waiting for ESP-NOW packets");
 }
 
 void loop() {
     updateHallSensor();
-    processPendingPacket();
-
-    unsigned long now = millis();
-    bool shouldResetEsc = false;
-
-    portENTER_CRITICAL(&pendingPacketMux);
-    if (!escResetDueToLoss && lastPacketTime > 0 && now - lastPacketTime > PACKET_LOSS_TIMEOUT_MS) {
-        escResetDueToLoss = true;
-        shouldResetEsc = true;
-    }
-    portEXIT_CRITICAL(&pendingPacketMux);
-
-    if (shouldResetEsc) {
-        setEscNeutral();
-        debugLogger.log("No ESP-NOW packet received recently; ESC reset to neutral");
-    }
+    vehicleCommandReceiver.update();
 }

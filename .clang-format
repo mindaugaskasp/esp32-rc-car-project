@@ -1,0 +1,29 @@
+# Formatting style for the ESP32 RC Car project.
+# Run:  clang-format -i src/**/*.{h,cpp}   (or via your editor's format-on-save)
+---
+Language: Cpp
+BasedOnStyle: Google
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+
+AccessModifierOffset: -4
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveMacros: Consecutive
+
+SortIncludes: false          # include order is meaningful (own header first)
+IncludeBlocks: Preserve
+
+SpaceBeforeParens: ControlStatements
+BreakBeforeBraces: Attach
+NamespaceIndentation: None
+FixNamespaceComments: true

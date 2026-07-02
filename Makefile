@@ -13,7 +13,12 @@ _RX_UPLOAD := $(if $(_RX_PORT),--upload-port $(_RX_PORT),)
 _TX_MON    := $(if $(_TX_PORT),--port $(_TX_PORT),)
 _RX_MON    := $(if $(_RX_PORT),--port $(_RX_PORT),)
 
-.PHONY: help test build-tx build-rx upload-tx upload-rx monitor-tx monitor-rx ports set-tx set-rx clean
+# --fail-on-defect level halts the build when a defect at/above this severity is found.
+# Medium is the enforced floor: no medium/high defects may be present to build.
+# Override on the command line, e.g. make build-tx FAIL_ON=low
+FAIL_ON ?= medium
+
+.PHONY: help test check check-tx check-rx build-tx build-rx upload-tx upload-rx monitor-tx monitor-rx ports set-tx set-rx clean
 
 help:
 	@echo "Usage: make <target> [PORT=/dev/cu.usbserial-xxx]"
@@ -22,8 +27,11 @@ help:
 	@echo "  set-tx        Save transmitter port  (make set-tx PORT=...)"
 	@echo "  set-rx        Save receiver port     (make set-rx PORT=...)"
 	@echo "  test          Run native unit tests"
-	@echo "  build-tx      Compile transmitter firmware"
-	@echo "  build-rx      Compile receiver firmware"
+	@echo "  check         Run static analysis on both firmwares"
+	@echo "  check-tx      Run static analysis on transmitter"
+	@echo "  check-rx      Run static analysis on receiver"
+	@echo "  build-tx      Static-check, then compile transmitter firmware"
+	@echo "  build-rx      Static-check, then compile receiver firmware"
 	@echo "  upload-tx     Upload transmitter firmware"
 	@echo "  upload-rx     Upload receiver firmware"
 	@echo "  monitor-tx    Open serial monitor (transmitter baud)"
@@ -51,16 +59,24 @@ set-rx:
 test:
 	$(PIO) test -e native
 
-build-tx:
+check: check-tx check-rx
+
+check-tx:
+	$(PIO) check -e transmitter --fail-on-defect $(FAIL_ON)
+
+check-rx:
+	$(PIO) check -e receiver --fail-on-defect $(FAIL_ON)
+
+build-tx: check-tx
 	$(PIO) run -e transmitter
 
-build-rx:
+build-rx: check-rx
 	$(PIO) run -e receiver
 
-upload-tx:
+upload-tx: check-tx
 	$(PIO) run -e transmitter --target upload $(_TX_UPLOAD)
 
-upload-rx:
+upload-rx: check-rx
 	$(PIO) run -e receiver --target upload $(_RX_UPLOAD)
 
 monitor-tx:
