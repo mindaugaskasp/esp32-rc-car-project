@@ -3,8 +3,8 @@
 #include <stdint.h>
 
 struct VehicleData {
-    int servoPos;          // X axis
-    int escSpeed;          // Y axis
+    int servoPosition; // X axis
+    int escSpeed; // Y axis
     uint32_t txTimestampMs; // transmitter millis() at send time, echoed back for RTT
 };
 static_assert(sizeof(VehicleData) == 12, "VehicleData wire size changed");

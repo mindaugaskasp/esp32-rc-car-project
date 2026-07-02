@@ -7,8 +7,8 @@
 // that returns the ESC to neutral if the transmitter goes quiet.
 class VehicleCommandReceiver {
 public:
-    void begin();   // registers the ESP-NOW receive callback
-    void update();  // call every loop(): dispatches pending packets, runs the watchdog
+    void begin(); // registers the ESP-NOW receive callback
+    void update(); // call every loop(): dispatches pending packets, runs the watchdog
 
     // ESP-NOW callback entry point. Public only because the C callback API
     // can't reach a private member — not part of the intended call surface.
@@ -25,12 +25,12 @@ private:
 
     void dispatch(const uint8_t* mac, const VehicleData& data);
 
-    portMUX_TYPE  _mux = portMUX_INITIALIZER_UNLOCKED;
+    portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
     PendingPacket _pending = {};
     volatile bool _pendingAvailable = false;
 
-    unsigned long _lastPacketTime     = 0;
-    bool          _escResetDueToLoss  = false;
+    unsigned long _lastPacketTime = 0;
+    bool _escResetDueToLoss = false;
 };
 
 extern VehicleCommandReceiver vehicleCommandReceiver;

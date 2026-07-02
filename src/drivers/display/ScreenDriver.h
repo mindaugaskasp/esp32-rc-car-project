@@ -25,9 +25,9 @@ public:
 
     // Text — set font before calling textW() for accurate measurement.
     virtual void font(ScreenFont f) = 0;
-    virtual void text(int x, int y, const char* str) = 0;
-    virtual void scrollText(int y, const char* str) = 0;  // marquee if too wide
-    virtual int  textW(const char* str) = 0;
+    virtual void text(int x, int y, const char* content) = 0;
+    virtual void scrollText(int y, const char* content) = 0; // marquee if too wide
+    virtual int textW(const char* content) = 0;
 
     // Graphics primitives.
     virtual void hline(int x, int y, int w) = 0;

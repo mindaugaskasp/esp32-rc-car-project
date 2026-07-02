@@ -7,118 +7,118 @@
 Screen screen;
 
 void Screen::begin() {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
-    d->init();
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
+    driver->init();
     showStartup("Initializing...");
 }
 
 void Screen::showStartup(const char* message) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
-    d->clear();
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
+    driver->clear();
 
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "RC Remote");
-    d->hline(0, 13, ScreenDriver::W);
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "RC Remote");
+    driver->hline(0, 13, ScreenDriver::W);
 
-    d->font(ScreenFont::Small);
-    d->text(0, 25, message);
+    driver->font(ScreenFont::Small);
+    driver->text(0, 25, message);
 
-    d->flush();
+    driver->flush();
 }
 
 void Screen::showConnectionEstablished() {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
-    d->clear();
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
+    driver->clear();
 
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "RC Remote");
-    d->hline(0, 13, ScreenDriver::W);
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "RC Remote");
+    driver->hline(0, 13, ScreenDriver::W);
 
-    d->font(ScreenFont::Small);
-    d->text(0, 25, "Car connected!");
-    d->text(0, 35, "Loading dashboard...");
+    driver->font(ScreenFont::Small);
+    driver->text(0, 25, "Car connected!");
+    driver->text(0, 35, "Loading dashboard...");
 
-    d->flush();
+    driver->flush();
 }
 
-void Screen::showDashboard(const DashboardData& dd) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+void Screen::showDashboard(const DashboardData& dashboard) {
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
     // ── Battery row with latency centred between the two voltages ──────────
-    d->font(ScreenFont::Small);
-    snprintf(buf, sizeof(buf), "CAR %.2fV", dd.carBatteryVoltage);
-    d->text(0, 10, buf);
+    driver->font(ScreenFont::Small);
+    snprintf(buffer, sizeof(buffer), "CAR %.2fV", dashboard.carBatteryVoltage);
+    driver->text(0, 10, buffer);
 
-    snprintf(buf, sizeof(buf), "%.2fV RMT", dd.remoteBatteryVoltage);
-    d->text(ScreenDriver::W - d->textW(buf), 10, buf);
+    snprintf(buffer, sizeof(buffer), "%.2fV RMT", dashboard.remoteBatteryVoltage);
+    driver->text(ScreenDriver::W - driver->textW(buffer), 10, buffer);
 
-    d->font(ScreenFont::Tiny);
+    driver->font(ScreenFont::Tiny);
 #if DEBUG_DASHBOARD_LINK_STATS
     // Rotate the single indicator slot between latency / loss / jitter so all
     // three fit without crowding the battery row.
     int statSlot = (int)((millis() / DASHBOARD_STAT_DWELL_MS) % 3);
-    if (statSlot == 1 && dd.lossPercent >= 0) {
-        snprintf(buf, sizeof(buf), "L:%d%%", dd.lossPercent);
-    } else if (statSlot == 2 && dd.jitterMs >= 0) {
-        snprintf(buf, sizeof(buf), "J:%dms", dd.jitterMs);
-    } else if (dd.latencyMs >= 0) {
-        snprintf(buf, sizeof(buf), "%dms", dd.latencyMs);
+    if (statSlot == 1 && dashboard.lossPercent >= 0) {
+        snprintf(buffer, sizeof(buffer), "L:%d%%", dashboard.lossPercent);
+    } else if (statSlot == 2 && dashboard.jitterMs >= 0) {
+        snprintf(buffer, sizeof(buffer), "J:%dms", dashboard.jitterMs);
+    } else if (dashboard.latencyMs >= 0) {
+        snprintf(buffer, sizeof(buffer), "%dms", dashboard.latencyMs);
     } else {
-        snprintf(buf, sizeof(buf), "--");
+        snprintf(buffer, sizeof(buffer), "--");
     }
 #else
-    if (dd.latencyMs < 0) snprintf(buf, sizeof(buf), "--");
-    else                   snprintf(buf, sizeof(buf), "%dms", dd.latencyMs);
+    if (dashboard.latencyMs < 0) snprintf(buffer, sizeof(buffer), "--");
+    else snprintf(buffer, sizeof(buffer), "%dms", dashboard.latencyMs);
 #endif
-    d->text((ScreenDriver::W - d->textW(buf)) / 2, 10, buf);
+    driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 10, buffer);
 
-    d->hline(0, 14, ScreenDriver::W);
+    driver->hline(0, 14, ScreenDriver::W);
 
     // ── Menu hint (tiny, right-aligned in the gap above speed) ───────────────
-    d->font(ScreenFont::Tiny);
-    d->text(ScreenDriver::W - d->textW("SW2:menu"), 20, "SW2:menu");
+    driver->font(ScreenFont::Tiny);
+    driver->text(ScreenDriver::W - driver->textW("SW2:menu"), 20, "SW2:menu");
 
     // ── Speed ────────────────────────────────────────────────────────────────
-    d->font(ScreenFont::Large);
-    snprintf(buf, sizeof(buf), "%.1f km/h", dd.speedKmh);
-    d->text((ScreenDriver::W - d->textW(buf)) / 2, 34, buf);
+    driver->font(ScreenFont::Large);
+    snprintf(buffer, sizeof(buffer), "%.1f km/h", dashboard.speedKmh);
+    driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 34, buffer);
 
     // ── Max speed ─────────────────────────────────────────────────────────────
-    d->font(ScreenFont::Small);
-    snprintf(buf, sizeof(buf), "MAX %.1f", dd.maxSpeedKmh);
-    d->text((ScreenDriver::W - d->textW(buf)) / 2, 44, buf);
+    driver->font(ScreenFont::Small);
+    snprintf(buffer, sizeof(buffer), "MAX %.1f", dashboard.maxSpeedKmh);
+    driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 44, buffer);
 
     // ── RPM ───────────────────────────────────────────────────────────────────
-    d->font(ScreenFont::Medium);
-    snprintf(buf, sizeof(buf), "%d RPM", dd.speedRpm);
-    d->text((ScreenDriver::W - d->textW(buf)) / 2, 57, buf);
+    driver->font(ScreenFont::Medium);
+    snprintf(buffer, sizeof(buffer), "%d RPM", dashboard.speedRpm);
+    driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 57, buffer);
 
-    d->flush();
+    driver->flush();
 }
 
 void Screen::showTelemetry(float batteryVoltage, int speedRpm) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "RC Car Telemetry");
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "RC Car Telemetry");
 
-    d->font(ScreenFont::Small);
-    snprintf(buf, sizeof(buf), "Battery: %.2fV", batteryVoltage);
-    d->text(0, 30, buf);
+    driver->font(ScreenFont::Small);
+    snprintf(buffer, sizeof(buffer), "Battery: %.2fV", batteryVoltage);
+    driver->text(0, 30, buffer);
 
-    snprintf(buf, sizeof(buf), "Speed: %d RPM", speedRpm);
-    d->text(0, 45, buf);
+    snprintf(buffer, sizeof(buffer), "Speed: %d RPM", speedRpm);
+    driver->text(0, 45, buffer);
 
-    d->flush();
+    driver->flush();
 }

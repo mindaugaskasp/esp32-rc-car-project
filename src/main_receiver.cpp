@@ -15,11 +15,11 @@
 // timeout must comfortably exceed that so the two boots have real overlap even
 // if they aren't powered on at exactly the same moment.
 static const unsigned long CHANNEL_SYNC_TIMEOUT_MS = 20000;
-static const uint8_t       CHANNEL_SYNC_FALLBACK    = 6;
+static const uint8_t CHANNEL_SYNC_FALLBACK = 6;
 
 void setup() {
     Serial.begin(BAUD_RATE);
-    delay(500);  // Wait for serial monitor to connect
+    delay(500); // Wait for serial monitor to connect
     debugLogger.log("RC Car Starting...");
     printMacAddress();
 
@@ -31,7 +31,7 @@ void setup() {
     initEspNow();
 
     // Wait for a channel advertisement from our transmitter, fall back to CHANNEL_SYNC_FALLBACK
-    uint8_t channel = receiveChannelAdvert(TRANSMITTER_MAC, CHANNEL_SYNC_TIMEOUT_MS, CHANNEL_SYNC_FALLBACK);
+    uint8_t channel = receiveChannelAdvertisement(TRANSMITTER_MAC, CHANNEL_SYNC_TIMEOUT_MS, CHANNEL_SYNC_FALLBACK);
     applyWifiChannel(channel);
 
     addPeer(TRANSMITTER_MAC);

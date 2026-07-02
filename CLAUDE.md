@@ -129,12 +129,12 @@ Rules:
 // EscLogic.h — no Arduino.h, no ESP32Servo.h
 #pragma once
 
-static const int ESC_MIN_MICROS     = 1100;
+static const int ESC_MIN_MICROS = 1100;
 static const int ESC_NEUTRAL_MICROS = 1500;
-static const int ESC_MAX_MICROS     = 1900;
+static const int ESC_MAX_MICROS = 1900;
 
 inline int computeEscMicros(int rawY) {
-    if (rawY < 0)    rawY = 0;
+    if (rawY < 0) rawY = 0;
     if (rawY > 4095) rawY = 4095;
     int targetSpeed = (int)((long)rawY * (ESC_MAX_MICROS - ESC_MIN_MICROS) / 4095) + ESC_MIN_MICROS;
     if (rawY > 1900 && rawY < 2200) targetSpeed = ESC_NEUTRAL_MICROS;
@@ -152,13 +152,31 @@ Use `constexpr` for all typed numeric and boolean constants. Reserve `#define` f
 ```cpp
 // Prefer
 constexpr int SERVO_PIN = 32;
-constexpr int ESC_PIN   = 13;
+constexpr int ESC_PIN = 13;
 
 // Avoid for typed values
 #define SERVO_PIN 32   // no type safety, no scoping
 ```
 
 Exception: `ControlConfig.h` uses `#define` for constants shared between the native test environment and Arduino builds. This is acceptable because Arduino's `constexpr` support can be unreliable across toolchain versions; keep these as `#define` until verified otherwise.
+
+### No column-alignment padding — single spaces only
+Use exactly one space around `=` and one space between a type and its identifier. Do **not**
+pad with extra spaces to vertically align `=` signs, values, or names across adjacent lines.
+Aligned columns look tidy but wreck diffs: renaming one constant reflows every neighbour.
+`make check` enforces this (and `.clang-format` has alignment disabled).
+
+```cpp
+// Good — one space, no padding
+static const uint8_t CHANNEL_SYNC_FALLBACK = 6;
+static const int ESC_MIN_MICROS = 1100;
+static const int ESC_NEUTRAL_MICROS = 1500;
+
+// Banned — alignment padding
+static const uint8_t       CHANNEL_SYNC_FALLBACK    = 6;
+static const int ESC_MIN_MICROS     = 1100;
+static const int ESC_NEUTRAL_MICROS = 1500;
+```
 
 ### Avoid magic numbers
 All numeric literals that encode hardware limits, protocol values, or calibration parameters must be named constants. Do not inline raw numbers in logic.
@@ -198,7 +216,9 @@ Boolean flags per subsystem with tagged macros. Flag the build down to zero over
 
 **Function naming is camelCase only** — do not use snake_case for new functions.
 
-**No single-character variable names** — every variable must have a descriptive name that makes its purpose obvious without reading surrounding context. `received`, `packet`, `available` are acceptable; `t`, `d`, `p`, `x` are not. Code must be explicit, clear, and stupid-simple.
+**No single-character variable names** — every variable must have a descriptive name that makes its purpose obvious without reading surrounding context. `received`, `packet`, `available` are acceptable; `t`, `d`, `p`, `x` are not. Code must be explicit, clear, and stupid-simple. The one exception is the graphics-primitive coordinate convention `x`, `y`, `w`, `h` in the display-driver drawing API (`text(int x, int y, …)`, `rect(int x, int y, int w, int h)`) — these are the universal names for pixel position/size and are clearer left as-is than expanded.
+
+**No cryptic abbreviations — spell names out in full.** This applies to every identifier: types, enums, functions, variables, and constants. A name must be understandable on its own without expanding a mental acronym. Prefer `TransmitterOperatingMode` over `TxMode`, `ReceiverCommand` over `RxCmd`, `calibrationConfig` over `calibCfg`, `messageCount` over `msgCnt`. Only these widely-understood domain terms are exempt: `Esc`, `Pwm`, `Adc`, `Rpm`, `Rtt`, `Mac`, `I2C`, `Micros` (microseconds), and the fixed-width type suffixes. When in doubt, write it out — a longer name is always preferable to an ambiguous short one.
 
 ### Enums — always use `enum class`
 Scoped enums prevent name collisions and make intent explicit. Never use unscoped `enum`.
@@ -210,6 +230,70 @@ enum class EscMotorDirection : uint8_t { PositiveRotation = 1, Reversal = 2 };
 // Avoid
 enum EscMotorDirection { POSITIVE_ROTATION, REVERSAL };
 ```
+
+---
+
+## Essential C++ Practices
+
+Widely-accepted conventions from the [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/),
+scoped to what matters on an ESP32/Arduino target. These complement the driver, naming, and
+config rules above.
+
+### Const-correctness
+- Mark every variable that never changes `const` (or `constexpr` if compile-time).
+- Pass non-trivial parameters by `const&`; pass small POD types (`int`, `uint8_t`, `float`, an enum) by value.
+- Mark member functions that do not modify state `const` (`int getCursor() const`).
+
+```cpp
+void showDashboard(const DashboardData& data);   // large struct → const&
+int computeEscMicros(int rawY);                  // small POD → by value
+```
+
+### Initialize every variable at the point of declaration
+No declaration should leave a variable indeterminate — value-initialize (`{}`) if there is no
+better value. This is also enforced by cppcheck (`uninitMemberVarPrivate`).
+
+```cpp
+int currentRpm = 0;
+PingStats stats{};      // zero-initialize all members
+bool available = false;
+```
+
+### Prefer references over pointers when the argument is never null
+Use `T&` for a required argument; reserve `T*` for genuinely optional/nullable ones, and
+null-check pointers before dereferencing (`if (!driver) return;`).
+
+### Casts — never C-style
+Use `static_cast` for numeric/derived conversions and `reinterpret_cast` for byte-buffer
+punning (ESP-NOW send/receive). C-style `(uint8_t*)x` casts are banned (cppcheck flags them).
+
+```cpp
+esp_now_send(mac, reinterpret_cast<const uint8_t*>(&packet), sizeof(packet));
+int rounded = static_cast<int>(value + 0.5f);
+```
+
+### `nullptr`, not `NULL` or `0`
+Always use `nullptr` for pointers.
+
+### Override virtuals explicitly
+Every override of a virtual (e.g. a concrete `ScreenDriver`) must carry `override` so the
+compiler catches signature drift. Use `final` when no further overriding is intended.
+
+### Constructors that take one argument are `explicit`
+Prevents silent implicit conversions (cppcheck flags `noExplicitConstructor`).
+
+### No dynamic allocation, exceptions, or RTTI in firmware
+Embedded target: avoid `new`/`delete`, `malloc`, `std::string`, STL containers that heap-allocate,
+`throw`, and `dynamic_cast` on the hot path. Prefer fixed-size buffers and stack/static storage.
+This is why the ESP-NOW structs are POD and the ISR pattern copies into a static buffer.
+
+### `static` for internal linkage; no `using namespace` in headers
+File-local helpers and state are `static` (see the driver pattern). Never put `using namespace`
+at file scope in a header — it leaks into every translation unit that includes it.
+
+### Use fixed-width integer types for wire and hardware values
+`uint8_t`/`int16_t`/`uint32_t` for anything that crosses ESP-NOW, maps to a register, or has a
+size contract. Reserve plain `int` for local arithmetic where width is irrelevant.
 
 ---
 

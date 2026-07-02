@@ -3,7 +3,7 @@
 int readInput(int pin) {
     long sum = 0;
     const int numSamples = 50;
-    for (int i = 0; i < numSamples; i++) {
+    for (int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++) {
         sum += analogRead(pin);
     }
     return (int)(sum / numSamples);

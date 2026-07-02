@@ -8,59 +8,59 @@
 DebugScreen debugScreen;
 
 void DebugScreen::showJoystickData(int joystickX, int joystickY) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
-    d->font(ScreenFont::Small);
-    d->text(0, 7, "DEBUG JOYSTICK TX");
+    driver->font(ScreenFont::Small);
+    driver->text(0, 7, "DEBUG JOYSTICK TX");
 
-    snprintf(buf, sizeof(buf), "X raw: %d", joystickX);
-    d->text(0, 17, buf);
+    snprintf(buffer, sizeof(buffer), "X raw: %d", joystickX);
+    driver->text(0, 17, buffer);
 
-    snprintf(buf, sizeof(buf), "Y raw: %d", joystickY);
-    d->text(0, 25, buf);
+    snprintf(buffer, sizeof(buffer), "Y raw: %d", joystickY);
+    driver->text(0, 25, buffer);
 
-    snprintf(buf, sizeof(buf), "X delta: %+d", joystickX - JOYSTICK_CENTER_RAW);
-    d->text(0, 35, buf);
+    snprintf(buffer, sizeof(buffer), "X delta: %+d", joystickX - JOYSTICK_CENTER_RAW);
+    driver->text(0, 35, buffer);
 
-    snprintf(buf, sizeof(buf), "Y delta: %+d", joystickY - JOYSTICK_CENTER_RAW);
-    d->text(0, 43, buf);
+    snprintf(buffer, sizeof(buffer), "Y delta: %+d", joystickY - JOYSTICK_CENTER_RAW);
+    driver->text(0, 43, buffer);
 
-    snprintf(buf, sizeof(buf), "Sent: %lu ms", millis());
-    d->text(0, 51, buf);
+    snprintf(buffer, sizeof(buffer), "Sent: %lu ms", millis());
+    driver->text(0, 51, buffer);
 
-    d->hline(0, 54, ScreenDriver::W);
-    drawSysInfoFooter(*d, 62);
+    driver->hline(0, 54, ScreenDriver::W);
+    drawSysInfoFooter(*driver, 62);
 
-    d->flush();
+    driver->flush();
 }
 
 void DebugScreen::showTelemetry(float batteryVoltage, int speedRpm) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
-    d->font(ScreenFont::Small);
-    d->text(0, 7, "DEBUG TELEMETRY RX");
+    driver->font(ScreenFont::Small);
+    driver->text(0, 7, "DEBUG TELEMETRY RX");
 
-    snprintf(buf, sizeof(buf), "Battery: %.2fV", batteryVoltage);
-    d->text(0, 17, buf);
+    snprintf(buffer, sizeof(buffer), "Battery: %.2fV", batteryVoltage);
+    driver->text(0, 17, buffer);
 
-    snprintf(buf, sizeof(buf), "Speed: %d RPM", speedRpm);
-    d->text(0, 25, buf);
+    snprintf(buffer, sizeof(buffer), "Speed: %d RPM", speedRpm);
+    driver->text(0, 25, buffer);
 
-    snprintf(buf, sizeof(buf), "RX: %lu ms", millis());
-    d->text(0, 35, buf);
+    snprintf(buffer, sizeof(buffer), "RX: %lu ms", millis());
+    driver->text(0, 35, buffer);
 
-    d->text(0, 43, "Packet: new hash");
+    driver->text(0, 43, "Packet: new hash");
 
-    d->hline(0, 47, ScreenDriver::W);
-    drawSysInfoFooter(*d, 55);
+    driver->hline(0, 47, ScreenDriver::W);
+    drawSysInfoFooter(*driver, 55);
 
-    d->flush();
+    driver->flush();
 }

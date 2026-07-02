@@ -165,6 +165,81 @@ Pure computation (mapping, deadzone, clamping) is separated into header-only fil
 
 ---
 
+## Firmware State Machines
+
+### Transmitter
+
+`main_transmitter.cpp` owns a top-level mode machine (`TransmitterOperatingMode`). After a boot
+sequence that negotiates the Wi-Fi channel with the receiver, it starts in **Dashboard**.
+**Mode Select** is the hub: any mode opens it with the menu gesture, and it either launches the
+chosen mode (SW2) or cancels back to the mode it was opened from (SW1). **Calibration** is itself
+a nested flow.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Boot
+
+    state Boot {
+        [*] --> ChannelSync : init drivers + ESP-NOW
+        ChannelSync --> ChannelReady : scan → advertise chosen channel → apply
+    }
+    Boot --> Dashboard : setup() complete
+
+    Dashboard --> ModeSelect : open-menu gesture (SW tap)
+    Debug --> ModeSelect : open-menu gesture (SW tap)
+    Calibration --> ModeSelect : X-left tap at menu root (wantsExit)
+    WifiPing --> ModeSelect : SW1 (wantsExit)
+
+    ModeSelect --> Dashboard : select "Dashboard" (SW2)
+    ModeSelect --> Debug : select "Debug Info" (SW2)
+    ModeSelect --> Calibration : select "Calibration" (SW2)
+    ModeSelect --> WifiPing : select "WiFi Ping" (SW2)
+
+    note right of ModeSelect
+        SW1 (cancel) returns to the
+        mode the menu was opened from
+    end note
+
+    state Calibration {
+        [*] --> Menu
+        Menu --> Running : X-right tap (launch item)
+        Running --> Menu : X-left tap (cancel)
+        Running --> ResultPause : calibration complete
+        ResultPause --> Menu : after 3 s
+    }
+```
+
+### Receiver
+
+`main_receiver.cpp` is headless. It initialises the actuators, listens for the transmitter's
+channel advertisement (falling back to channel 6 after a 20 s timeout), then runs a two-state
+runtime: **Armed** while packets flow, dropping to **Fail-Safe** (ESC forced to neutral) if no
+`VehicleData` packet arrives within the 500 ms watchdog window. The next valid packet re-arms it.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Boot
+
+    state Boot {
+        [*] --> InitActuators : servo, ESC, hall sensor
+        InitActuators --> AwaitChannel : ESP-NOW init
+        AwaitChannel --> ChannelReady : advertisement received
+        AwaitChannel --> ChannelReady : 20 s timeout → fallback ch 6
+    }
+    Boot --> Armed : addPeer + register receive callback
+
+    Armed --> Armed : VehicleData → set servo + ESC, echo telemetry
+    Armed --> FailSafe : no packet for 500 ms (watchdog)
+    FailSafe --> Armed : next VehicleData packet
+
+    note right of FailSafe
+        ESC forced to neutral once;
+        stays neutral until a packet arrives
+    end note
+```
+
+---
+
 ## Hall Sensor (RPM telemetry)
 
 Motor RPM is measured on the receiver by a **KY-003 / 3144 unipolar Hall effect sensor** and sent back to the transmitter as part of the `TelemetryData` packet. The transmitter dashboard displays RPM live.

@@ -6,7 +6,7 @@ class DebugLogger {
 public:
     void log(const char* message);
     void logf(const char* format, ...);
-    void logJoystick(int x, int y);
+    void logJoystick(int joystickX, int joystickY);
     void logEsc(int speed);
 };
 

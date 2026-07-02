@@ -26,4 +26,4 @@
 
 void initHallSensor();
 void updateHallSensor();
-int  getMotorRpm();
+int getMotorRpm();

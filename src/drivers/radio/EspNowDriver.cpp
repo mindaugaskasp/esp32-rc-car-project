@@ -29,9 +29,9 @@ void initEspNow() {
 }
 
 
-void addPeer(const uint8_t* macAddr) {
+void addPeer(const uint8_t* macAddress) {
     esp_now_peer_info_t peerInfo = {};
-    memcpy(peerInfo.peer_addr, macAddr, 6);
+    memcpy(peerInfo.peer_addr, macAddress, 6);
     peerInfo.channel = 0;
     peerInfo.ifidx = WIFI_IF_STA;
     peerInfo.encrypt = false;
@@ -40,12 +40,12 @@ void addPeer(const uint8_t* macAddr) {
     if (peerResult != ESP_OK) {
         char peerMac[18];
         snprintf(peerMac, sizeof(peerMac), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+                 macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
         debugLogger.logf("Failed to add peer %s: %s (%d)", peerMac, espNowErrorToString(peerResult), peerResult);
     } else {
         char peerMac[18];
         snprintf(peerMac, sizeof(peerMac), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+                 macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
         debugLogger.logf("Peer added: %s", peerMac);
     }
 }

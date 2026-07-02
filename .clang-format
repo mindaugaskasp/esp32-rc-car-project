@@ -17,8 +17,11 @@ AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLoopsOnASingleLine: true
 
-AlignConsecutiveAssignments: Consecutive
-AlignConsecutiveMacros: Consecutive
+# No column-alignment padding — a single space around '=' and between type and
+# name. Aligned assignments/declarations create noisy diffs and are banned.
+AlignConsecutiveAssignments: None
+AlignConsecutiveMacros: None
+AlignConsecutiveDeclarations: None
 
 SortIncludes: false          # include order is meaningful (own header first)
 IncludeBlocks: Preserve

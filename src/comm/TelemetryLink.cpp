@@ -5,9 +5,9 @@
 
 TelemetryLink telemetryLink;
 
-static uint32_t hashTelemetry(const TelemetryData& t) {
-    uint32_t v = (uint32_t)(t.batteryVoltage * 100.0f + 0.5f);
-    return (v << 16) | (uint32_t)(t.speedRpm & 0xFFFF);
+static uint32_t hashTelemetry(const TelemetryData& telemetry) {
+    uint32_t voltagePart = (uint32_t)(telemetry.batteryVoltage * 100.0f + 0.5f);
+    return (voltagePart << 16) | (uint32_t)(telemetry.speedRpm & 0xFFFF);
 }
 
 static void onTelemetryReceiveTrampoline(const uint8_t* mac, const uint8_t* incomingData, int len) {
@@ -31,7 +31,7 @@ void TelemetryLink::handleReceive(const uint8_t* mac, const uint8_t* incomingDat
               : -1;
 
     portENTER_CRITICAL(&_mux);
-    _pending          = t;
+    _pending = t;
     _pendingAvailable = true;
     _rxCount++;
     if (rtt >= 0) {
@@ -60,7 +60,7 @@ bool TelemetryLink::process() {
     uint32_t hash = hashTelemetry(received);
     if (hash == _lastHash) return false;
 
-    _latest   = received;
+    _latest = received;
     _lastHash = hash;
 
     unsigned long now = millis();
@@ -75,14 +75,14 @@ TelemetryLink::RttDrainResult TelemetryLink::drainRttStats() {
     RttDrainResult result;
     portENTER_CRITICAL(&_mux);
     result.sampleCount = _rttSampleCount;
-    result.sumMs       = _rttSumMs;
-    result.minMs       = _rttMinMs;
-    result.maxMs       = _rttMaxMs;
-    result.lastRtt      = _latestLatencyMs;
+    result.sumMs = _rttSumMs;
+    result.minMs = _rttMinMs;
+    result.maxMs = _rttMaxMs;
+    result.lastRtt = _latestLatencyMs;
     _rttSampleCount = 0;
-    _rttSumMs       = 0;
-    _rttMinMs       = RTT_ACCUM_MIN_RESET;
-    _rttMaxMs       = RTT_ACCUM_MAX_RESET;
+    _rttSumMs = 0;
+    _rttMinMs = RTT_ACCUM_MIN_RESET;
+    _rttMaxMs = RTT_ACCUM_MAX_RESET;
     portEXIT_CRITICAL(&_mux);
     return result;
 }

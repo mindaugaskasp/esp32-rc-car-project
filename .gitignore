@@ -37,3 +37,4 @@
 .pio/libdeps/
 src/esp32-rc-car-project.code-workspace
 .ports
+.claude

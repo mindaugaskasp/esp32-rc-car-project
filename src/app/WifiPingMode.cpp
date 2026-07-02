@@ -10,18 +10,18 @@
 WifiPingMode wifiPingMode;
 
 void WifiPingMode::begin() {
-    _stats            = {};
+    _stats = {};
     _stats.currentRtt = -1;
-    _stats.minRtt     = PING_RTT_UNSET;
-    _stats.maxRtt     = -1;
-    _rttSum           = 0;
-    _rttSampleTotal   = 0;
-    _prevRtt          = -1;
-    _lastSendTime     = 0;
+    _stats.minRtt = PING_RTT_UNSET;
+    _stats.maxRtt = -1;
+    _rttSum = 0;
+    _rttSampleTotal = 0;
+    _prevRtt = -1;
+    _lastSendTime = 0;
     _lastScreenUpdate = 0;
-    _wantsExit        = false;
+    _wantsExit = false;
 
-    telemetryLink.drainRttStats();  // discard anything accumulated before entering this mode
+    telemetryLink.drainRttStats(); // discard anything accumulated before entering this mode
     _lastRxCount = telemetryLink.getRxCount();
 }
 
@@ -53,9 +53,9 @@ void WifiPingMode::update() {
     }
 
     if (drained.sampleCount > 0) {
-        _rttSum         += drained.sumMs;
+        _rttSum += drained.sumMs;
         _rttSampleTotal += drained.sampleCount;
-        _stats.avgRttMs  = (int)(_rttSum / (long)_rttSampleTotal);
+        _stats.avgRttMs = (int)(_rttSum / (long)_rttSampleTotal);
         if (drained.minMs < _stats.minRtt) _stats.minRtt = drained.minMs;
         if (drained.maxMs > _stats.maxRtt) _stats.maxRtt = drained.maxMs;
 

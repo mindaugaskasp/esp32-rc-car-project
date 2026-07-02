@@ -14,20 +14,20 @@ public:
     bool wantsExit();
 
 private:
-    static constexpr int PING_RTT_UNSET = 9999;  // sentinel for minRtt before any reply arrives
+    static constexpr int PING_RTT_UNSET = 9999; // sentinel for minRtt before any reply arrives
     static const unsigned long SEND_INTERVAL_MS = 20;
-    static const unsigned long SCREEN_REFRESH_MS = 200;  // 5Hz — avoid I2C overhead slowing the send rate
+    static const unsigned long SCREEN_REFRESH_MS = 200; // 5Hz — avoid I2C overhead slowing the send rate
 
-    PingStats     _stats{};
-    long          _rttSum         = 0;
-    uint32_t      _rttSampleTotal = 0;  // valid-RTT samples folded into _rttSum so far
-    int           _prevRtt        = -1;
-    uint32_t      _lastRxCount    = 0;
-    bool          _sw1Was         = false;
-    bool          _sw2Was         = false;
-    unsigned long _lastSendTime   = 0;
+    PingStats _stats{};
+    long _rttSum = 0;
+    uint32_t _rttSampleTotal = 0; // valid-RTT samples folded into _rttSum so far
+    int _prevRtt = -1;
+    uint32_t _lastRxCount = 0;
+    bool _sw1Was = false;
+    bool _sw2Was = false;
+    unsigned long _lastSendTime = 0;
     unsigned long _lastScreenUpdate = 0;
-    bool          _wantsExit      = false;
+    bool _wantsExit = false;
 };
 
 extern WifiPingMode wifiPingMode;

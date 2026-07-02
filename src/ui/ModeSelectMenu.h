@@ -3,7 +3,7 @@
 
 // The scrollable top-level mode menu (Dashboard / Debug / Calibration / WiFi
 // Ping) plus the shared "open the menu" button gesture used by every mode.
-// Deliberately knows nothing about the other mode classes or TxMode — it only
+// Deliberately knows nothing about the other mode classes or TransmitterOperatingMode — it only
 // reports selection/cancellation; the caller owns the actual mode switch.
 class ModeSelectMenu {
 public:
@@ -22,13 +22,13 @@ public:
     // joystickY drives the up/down tap gesture; SW1=cancel, SW2=confirm.
     Result update(int joystickY);
 
-    int8_t getCursor() const        { return _cursor; }
-    void   setCursor(int8_t cursor) { _cursor = cursor; }
+    int8_t getCursor() const { return _cursor; }
+    void setCursor(int8_t cursor) { _cursor = cursor; }
 
 private:
     static const unsigned long MS_TAP_MAX_MS = 700;
 
-    const char* const* _names = nullptr;  // caller-owned row labels
+    const char* const* _names = nullptr; // caller-owned row labels
     int8_t _count = 0;
     int8_t _cursor = 0;
 

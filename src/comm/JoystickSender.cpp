@@ -23,7 +23,7 @@ void JoystickSender::send(int joystickX, int joystickY, int centerRaw, const uin
     bool changedSinceLastSend = abs(joystickX - _lastSentX) > JOY_DEADZONE_X
                              || abs(joystickY - _lastSentY) > JOY_DEADZONE_Y;
     bool directionChanged = (abs(_lastSentY - centerRaw) > JOY_DEADZONE_Y)
-                          && (abs(joystickY  - centerRaw) > JOY_DEADZONE_Y)
+                          && (abs(joystickY - centerRaw) > JOY_DEADZONE_Y)
                           && ((_lastSentY < centerRaw) != (joystickY < centerRaw));
 
     if (movedX) _consecX++; else _consecX = 0;

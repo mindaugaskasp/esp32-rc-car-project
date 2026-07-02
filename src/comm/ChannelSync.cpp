@@ -16,12 +16,12 @@ uint8_t syncChannelWithReceiver() {
         wifiScanScreen.showScanning();
     });
 
-    // Broadcast the chosen channel on ADVERT_CHANNEL so the receiver can sync.
+    // Broadcast the chosen channel on ADVERTISEMENT_CHANNEL so the receiver can sync.
     // Display scan results while broadcasting — both happen simultaneously.
     initChannelBroadcast();
     unsigned long scanShownAt = millis();
     while (millis() - scanShownAt < CHANNEL_BROADCAST_MS) {
-        sendChannelAdvert(scanResult.bestChannel);
+        sendChannelAdvertisement(scanResult.bestChannel);
         int secsLeft = (int)((CHANNEL_BROADCAST_MS - (millis() - scanShownAt)) / 1000);
         wifiScanScreen.showResult(scanResult, secsLeft, /*broadcasting=*/true);
         if (readButton(JOY1_SW_PIN) || readButton(JOY2_SW_PIN)) break;

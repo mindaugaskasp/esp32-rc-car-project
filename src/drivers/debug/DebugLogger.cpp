@@ -24,7 +24,7 @@ void DebugLogger::logf(const char* format, ...) {
     log(buffer);
 }
 
-void DebugLogger::logJoystick(int x, int y) {
+void DebugLogger::logJoystick(int joystickX, int joystickY) {
     if (!DEBUG_JOYSTICK_TO_SERIAL) {
         return;
     }
@@ -35,7 +35,7 @@ void DebugLogger::logJoystick(int x, int y) {
     }
     lastLogTime = now;
     char buffer[128];
-    snprintf(buffer, sizeof(buffer), "[JOY]: X=%d Y=%d", x, y);
+    snprintf(buffer, sizeof(buffer), "[JOY]: X=%d Y=%d", joystickX, joystickY);
     logSerial(buffer);
 }
 

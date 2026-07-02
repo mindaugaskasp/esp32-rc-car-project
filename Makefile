@@ -18,7 +18,7 @@ _RX_MON    := $(if $(_RX_PORT),--port $(_RX_PORT),)
 # Override on the command line, e.g. make build-tx FAIL_ON=low
 FAIL_ON ?= medium
 
-.PHONY: help test check check-tx check-rx build-tx build-rx upload-tx upload-rx monitor-tx monitor-rx ports set-tx set-rx clean
+.PHONY: help test check check-format check-tx check-rx build-tx build-rx upload-tx upload-rx monitor-tx monitor-rx ports set-tx set-rx clean
 
 help:
 	@echo "Usage: make <target> [PORT=/dev/cu.usbserial-xxx]"
@@ -27,7 +27,8 @@ help:
 	@echo "  set-tx        Save transmitter port  (make set-tx PORT=...)"
 	@echo "  set-rx        Save receiver port     (make set-rx PORT=...)"
 	@echo "  test          Run native unit tests"
-	@echo "  check         Run static analysis on both firmwares"
+	@echo "  check         Run formatting + static analysis on both firmwares"
+	@echo "  check-format  Check for column-alignment padding (spacing rule)"
 	@echo "  check-tx      Run static analysis on transmitter"
 	@echo "  check-rx      Run static analysis on receiver"
 	@echo "  build-tx      Static-check, then compile transmitter firmware"
@@ -59,7 +60,10 @@ set-rx:
 test:
 	$(PIO) test -e native
 
-check: check-tx check-rx
+check: check-format check-tx check-rx
+
+check-format:
+	@python3 scripts/check_spacing.py
 
 check-tx:
 	$(PIO) check -e transmitter --fail-on-defect $(FAIL_ON)
@@ -67,16 +71,16 @@ check-tx:
 check-rx:
 	$(PIO) check -e receiver --fail-on-defect $(FAIL_ON)
 
-build-tx: check-tx
+build-tx: check-format check-tx
 	$(PIO) run -e transmitter
 
-build-rx: check-rx
+build-rx: check-format check-rx
 	$(PIO) run -e receiver
 
-upload-tx: check-tx
+upload-tx: check-format check-tx
 	$(PIO) run -e transmitter --target upload $(_TX_UPLOAD)
 
-upload-rx: check-rx
+upload-rx: check-format check-rx
 	$(PIO) run -e receiver --target upload $(_RX_UPLOAD)
 
 monitor-tx:

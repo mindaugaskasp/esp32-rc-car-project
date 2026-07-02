@@ -7,7 +7,7 @@ static const int SERVO_JOYSTICK_CENTER_RAW = JOYSTICK_CENTER_RAW;
 // Matches Arduino map() / constrain() / abs() integer arithmetic — no Arduino.h needed.
 // Applies deadzone, per-side mapping with calibration endpoints, center trim, and clamping.
 inline int computeServoMicros(int rawX) {
-    if (rawX < 0)    rawX = 0;
+    if (rawX < 0) rawX = 0;
     if (rawX > 4095) rawX = 4095;
 
     const int center = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;

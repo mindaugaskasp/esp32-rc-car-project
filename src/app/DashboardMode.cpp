@@ -18,18 +18,18 @@ void DashboardMode::markSetupComplete() {
 }
 
 void DashboardMode::showSyncWarning() {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
-    d->clear();
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "NO CONNECTION");
-    d->hline(0, 13, ScreenDriver::W);
-    d->font(ScreenFont::Small);
-    d->text(0, 25, "Channel sync failed.");
-    d->text(0, 35, "Restart car AND");
-    d->text(0, 45, "remote together to");
-    d->text(0, 55, "re-sync channels.");
-    d->flush();
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
+    driver->clear();
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "NO CONNECTION");
+    driver->hline(0, 13, ScreenDriver::W);
+    driver->font(ScreenFont::Small);
+    driver->text(0, 25, "Channel sync failed.");
+    driver->text(0, 35, "Restart car AND");
+    driver->text(0, 45, "remote together to");
+    driver->text(0, 55, "re-sync channels.");
+    driver->flush();
 }
 
 void DashboardMode::updateLinkStats(bool newTelemetry) {
@@ -43,42 +43,42 @@ void DashboardMode::updateLinkStats(bool newTelemetry) {
 
     unsigned long now = millis();
     uint32_t sentCount = joystickSender.getSentCount();
-    uint32_t rxCount   = telemetryLink.getRxCount();
+    uint32_t rxCount = telemetryLink.getRxCount();
 
     if (_lossWindowStart == 0) {
-        _lossWindowStart    = now;
+        _lossWindowStart = now;
         _lossWindowSentBase = sentCount;
-        _lossWindowRxBase   = rxCount;
+        _lossWindowRxBase = rxCount;
         return;
     }
     if (now - _lossWindowStart >= LOSS_WINDOW_MS) {
         uint32_t sentInWindow = sentCount - _lossWindowSentBase;
-        uint32_t rxInWindow   = rxCount - _lossWindowRxBase;
+        uint32_t rxInWindow = rxCount - _lossWindowRxBase;
         if (sentInWindow > 0) {
             uint32_t lostInWindow = (rxInWindow < sentInWindow) ? (sentInWindow - rxInWindow) : 0;
             _lossPercent = (int)(lostInWindow * 100 / sentInWindow);
         }
-        _lossWindowStart    = now;
+        _lossWindowStart = now;
         _lossWindowSentBase = sentCount;
-        _lossWindowRxBase   = rxCount;
+        _lossWindowRxBase = rxCount;
     }
 }
 
 void DashboardMode::show() {
     TelemetryData latest = telemetryLink.getLatest();
-    float kmh = speedKmh(latest.speedRpm);
-    if (kmh > _maxSpeedKmh) _maxSpeedKmh = kmh;
+    float currentSpeedKmh = speedKmh(latest.speedRpm);
+    if (currentSpeedKmh > _maxSpeedKmh) _maxSpeedKmh = currentSpeedKmh;
 
-    DashboardData d;
-    d.carBatteryVoltage    = latest.batteryVoltage;
-    d.remoteBatteryVoltage = MOCK_REMOTE_BATTERY_VOLTAGE;
-    d.speedRpm             = latest.speedRpm;
-    d.speedKmh             = kmh;
-    d.maxSpeedKmh          = _maxSpeedKmh;
-    d.latencyMs            = telemetryLink.getLatencyMs();
-    d.lossPercent          = _lossPercent;
-    d.jitterMs             = _jitterMs;
-    screen.showDashboard(d);
+    DashboardData dashboard;
+    dashboard.carBatteryVoltage = latest.batteryVoltage;
+    dashboard.remoteBatteryVoltage = MOCK_REMOTE_BATTERY_VOLTAGE;
+    dashboard.speedRpm = latest.speedRpm;
+    dashboard.speedKmh = currentSpeedKmh;
+    dashboard.maxSpeedKmh = _maxSpeedKmh;
+    dashboard.latencyMs = telemetryLink.getLatencyMs();
+    dashboard.lossPercent = _lossPercent;
+    dashboard.jitterMs = _jitterMs;
+    screen.showDashboard(dashboard);
 }
 
 bool DashboardMode::update(int joystickX, int joystickY) {
@@ -97,7 +97,7 @@ bool DashboardMode::update(int joystickX, int joystickY) {
     bool newTelemetry = telemetryLink.process();
     if (newTelemetry) {
         if (!_connectionEstablished) {
-            _connectionEstablished   = true;
+            _connectionEstablished = true;
             _connectionEstablishedAt = now;
         }
         if (!_dashboardShown) {

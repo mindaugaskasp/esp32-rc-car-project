@@ -17,17 +17,17 @@ void VehicleCommandReceiver::begin() {
 
 void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* incomingData, int len) {
     unsigned long receivedAt = millis();
-    size_t copyLen = 0;
+    size_t copyLength = 0;
     if (len > 0) {
-        copyLen = len < static_cast<int>(sizeof(_pending.data))
+        copyLength = len < static_cast<int>(sizeof(_pending.data))
             ? len
             : sizeof(_pending.data);
     }
 
     portENTER_CRITICAL(&_mux);
     memcpy(_pending.mac, mac, sizeof(_pending.mac));
-    if (copyLen > 0) {
-        memcpy(_pending.data, incomingData, copyLen);
+    if (copyLength > 0) {
+        memcpy(_pending.data, incomingData, copyLength);
     }
     _pending.len = len;
     _pendingAvailable = true;
@@ -37,7 +37,7 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
 }
 
 void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& data) {
-    setServoAngle(data.servoPos);
+    setServoAngle(data.servoPosition);
     updateEscSpeed(data.escSpeed);
 
     TelemetryData telemetry;
@@ -45,7 +45,7 @@ void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& dat
     telemetry.speedRpm = getMotorRpm();
     telemetry.echoTimestampMs = data.txTimestampMs;
 
-    debugLogger.logf("Received data: servo=%d esc=%d", data.servoPos, data.escSpeed);
+    debugLogger.logf("Received data: servo=%d esc=%d", data.servoPosition, data.escSpeed);
 
     esp_err_t result = esp_now_send(mac, reinterpret_cast<const uint8_t*>(&telemetry), sizeof(telemetry));
     if (result == ESP_OK) {

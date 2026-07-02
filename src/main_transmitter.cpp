@@ -23,44 +23,53 @@
 // Each mode's actual per-tick behavior lives in its own class (DashboardMode,
 // DebugMode, WifiPingMode, CalibrationFlow, ModeSelectMenu); this file only owns
 // which mode is active and how modes hand off to one another.
-enum class TxMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing };
+enum class TransmitterOperatingMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing };
 
 // Single source of truth for the mode menu: display label ↔ mode. The menu rows,
 // the menu cursor, and the selection dispatch all derive from this table, so
 // adding or reordering a selectable mode is a one-line change here.
-struct MenuEntry { const char* name; TxMode mode; };
+struct MenuEntry { const char* name; TransmitterOperatingMode mode; };
 static constexpr MenuEntry MENU[] = {
-    {"Dashboard",   TxMode::Dashboard},
-    {"Debug Info",  TxMode::Debug},
-    {"Calibration", TxMode::Calibration},
-    {"WiFi Ping",   TxMode::WifiPing},
+    {"Dashboard", TransmitterOperatingMode::Dashboard},
+    {"Debug Info", TransmitterOperatingMode::Debug},
+    {"Calibration", TransmitterOperatingMode::Calibration},
+    {"WiFi Ping", TransmitterOperatingMode::WifiPing},
 };
 static constexpr int8_t MENU_COUNT = sizeof(MENU) / sizeof(MENU[0]);
 
-static TxMode currentMode = TxMode::Dashboard;
-static TxMode prevMode    = TxMode::Dashboard;  // restored on ModeSelect cancel
+static TransmitterOperatingMode currentMode = TransmitterOperatingMode::Dashboard;
+static TransmitterOperatingMode prevMode = TransmitterOperatingMode::Dashboard; // restored on ModeSelect cancel
 
-static int8_t cursorForMode(TxMode mode) {
+static int8_t cursorForMode(TransmitterOperatingMode mode) {
     for (int8_t index = 0; index < MENU_COUNT; index++) {
         if (MENU[index].mode == mode) return index;
     }
     return 0;
 }
 
+// Flattens the MENU table's labels into the const char*[] ModeSelectMenu expects
+// and hands it over. menuNames is static so it outlives setup() — the menu keeps
+// the pointer rather than copying (see ModeSelectMenu::setEntries).
+static void initModeMenu() {
+    static const char* menuNames[MENU_COUNT];
+    for (int8_t index = 0; index < MENU_COUNT; index++) menuNames[index] = MENU[index].name;
+    modeSelectMenu.setEntries(menuNames, MENU_COUNT);
+}
+
 // Enter a mode from the menu, running its one-time entry hook.
-static void beginMode(TxMode mode) {
+static void beginMode(TransmitterOperatingMode mode) {
     currentMode = mode;
     switch (mode) {
-        case TxMode::Dashboard:   dashboardMode.show();    break;
-        case TxMode::Calibration: calibrationFlow.begin(); break;
-        case TxMode::WifiPing:    wifiPingMode.begin();    break;
-        default: break;  // Debug has no entry hook
+        case TransmitterOperatingMode::Dashboard: dashboardMode.show(); break;
+        case TransmitterOperatingMode::Calibration: calibrationFlow.begin(); break;
+        case TransmitterOperatingMode::WifiPing: wifiPingMode.begin(); break;
+        default: break; // Debug has no entry hook
     }
 }
 
-static void enterModeSelect(TxMode from) {
-    prevMode    = from;
-    currentMode = TxMode::ModeSelect;
+static void enterModeSelect(TransmitterOperatingMode from) {
+    prevMode = from;
+    currentMode = TransmitterOperatingMode::ModeSelect;
     modeSelectMenu.setCursor(cursorForMode(from));
     modeSelectMenu.show();
 }
@@ -74,9 +83,7 @@ void setup() {
     initButton(JOY1_SW_PIN);
     initButton(JOY2_SW_PIN);
 
-    static const char* menuNames[MENU_COUNT];
-    for (int8_t index = 0; index < MENU_COUNT; index++) menuNames[index] = MENU[index].name;
-    modeSelectMenu.setEntries(menuNames, MENU_COUNT);
+    initModeMenu();
 
     screen.begin();  // shows "Initializing..."
 
@@ -105,42 +112,42 @@ void loop() {
     int joystickY = readInput(JOY2_Y_PIN);
 
     switch (currentMode) {
-        case TxMode::Dashboard:
+        case TransmitterOperatingMode::Dashboard:
             if (dashboardMode.update(joystickX, joystickY)) {
-                enterModeSelect(TxMode::Dashboard);
+                enterModeSelect(TransmitterOperatingMode::Dashboard);
             }
             break;
 
-        case TxMode::Debug:
+        case TransmitterOperatingMode::Debug:
             if (debugMode.update(joystickX, joystickY)) {
-                enterModeSelect(TxMode::Debug);
+                enterModeSelect(TransmitterOperatingMode::Debug);
             }
             break;
 
-        case TxMode::ModeSelect: {
+        case TransmitterOperatingMode::ModeSelect: {
             ModeSelectMenu::Result result = modeSelectMenu.update(joystickY);
             if (result == ModeSelectMenu::Result::Selected) {
                 beginMode(MENU[modeSelectMenu.getCursor()].mode);
             } else if (result == ModeSelectMenu::Result::Cancelled) {
                 currentMode = prevMode;
-                if (currentMode == TxMode::Dashboard) dashboardMode.show();
+                if (currentMode == TransmitterOperatingMode::Dashboard) dashboardMode.show();
             }
             break;
         }
 
-        case TxMode::Calibration: {
+        case TransmitterOperatingMode::Calibration: {
             VehicleData data = calibrationFlow.update(joystickX, joystickY);
             sendData(data, RECEIVER_MAC);
             if (calibrationFlow.wantsExit()) {
-                enterModeSelect(TxMode::Calibration);
+                enterModeSelect(TransmitterOperatingMode::Calibration);
             }
             break;
         }
 
-        case TxMode::WifiPing:
+        case TransmitterOperatingMode::WifiPing:
             wifiPingMode.update();
             if (wifiPingMode.wantsExit()) {
-                enterModeSelect(TxMode::WifiPing);
+                enterModeSelect(TransmitterOperatingMode::WifiPing);
             }
             break;
     }

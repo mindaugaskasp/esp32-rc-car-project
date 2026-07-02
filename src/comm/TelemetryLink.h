@@ -14,16 +14,16 @@ public:
     // was available this call — also logs it at DEBUG_LOG_MIN_INTERVAL_MS.
     bool process();
 
-    TelemetryData getLatest() const    { return _latest; }
-    int           getLatencyMs() const { return _latestLatencyMs; }
-    uint32_t      getRxCount() const   { return _rxCount; }
+    TelemetryData getLatest() const { return _latest; }
+    int getLatencyMs() const { return _latestLatencyMs; }
+    uint32_t getRxCount() const { return _rxCount; }
 
     struct RttDrainResult {
         uint32_t sampleCount;
-        long     sumMs;
-        int      minMs;
-        int      maxMs;
-        int      lastRtt;
+        long sumMs;
+        int minMs;
+        int maxMs;
+        int lastRtt;
     };
     // Snapshots and resets the RTT accumulators. Safe to call from any mode —
     // whichever mode last drained them gets exactly the samples since then,
@@ -45,13 +45,13 @@ private:
     volatile uint32_t _rxCount = 0;
 
     volatile uint32_t _rttSampleCount = 0;
-    volatile long     _rttSumMs       = 0;
-    volatile int      _rttMinMs       = RTT_ACCUM_MIN_RESET;
-    volatile int      _rttMaxMs       = RTT_ACCUM_MAX_RESET;
+    volatile long _rttSumMs = 0;
+    volatile int _rttMinMs = RTT_ACCUM_MIN_RESET;
+    volatile int _rttMaxMs = RTT_ACCUM_MAX_RESET;
 
     TelemetryData _latest = {7.4f, 0};
-    uint32_t      _lastHash = 0;
-    int           _latestLatencyMs = -1;
+    uint32_t _lastHash = 0;
+    int _latestLatencyMs = -1;
 
     unsigned long _lastLogTime = 0;
 };

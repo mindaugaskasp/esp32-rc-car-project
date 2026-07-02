@@ -6,44 +6,44 @@
 WifiPingScreen wifiPingScreen;
 
 void WifiPingScreen::show(const PingStats& stats) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "WIFI PING");
-    d->hline(0, 13, ScreenDriver::W);
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "WIFI PING");
+    driver->hline(0, 13, ScreenDriver::W);
 
-    d->font(ScreenFont::Small);
+    driver->font(ScreenFont::Small);
 
     uint32_t lossPercent = (stats.sent > 0 && stats.sent >= stats.received)
         ? (stats.sent - stats.received) * 100 / stats.sent
         : 0;
-    snprintf(buf, sizeof(buf), "Sent:%-5lu Loss:%2lu%%", (unsigned long)stats.sent, (unsigned long)lossPercent);
-    d->text(0, 24, buf);
+    snprintf(buffer, sizeof(buffer), "Sent:%-5lu Loss:%2lu%%", (unsigned long)stats.sent, (unsigned long)lossPercent);
+    driver->text(0, 24, buffer);
 
     if (stats.currentRtt >= 0) {
-        snprintf(buf, sizeof(buf), "RTT:%4dms Avg:%4dms", stats.currentRtt, stats.avgRttMs);
+        snprintf(buffer, sizeof(buffer), "RTT:%4dms Avg:%4dms", stats.currentRtt, stats.avgRttMs);
     } else {
-        snprintf(buf, sizeof(buf), "RTT:  ---  Avg:  ---");
+        snprintf(buffer, sizeof(buffer), "RTT:  ---  Avg:  ---");
     }
-    d->text(0, 34, buf);
+    driver->text(0, 34, buffer);
 
     if (stats.maxRtt >= 0) {
-        snprintf(buf, sizeof(buf), "Min:%4dms Max:%4dms", stats.minRtt, stats.maxRtt);
+        snprintf(buffer, sizeof(buffer), "Min:%4dms Max:%4dms", stats.minRtt, stats.maxRtt);
     } else {
-        snprintf(buf, sizeof(buf), "Min:  ---  Max:  ---");
+        snprintf(buffer, sizeof(buffer), "Min:  ---  Max:  ---");
     }
-    d->text(0, 44, buf);
+    driver->text(0, 44, buffer);
 
-    snprintf(buf, sizeof(buf), "Jitter:%3dms", stats.jitter);
-    d->text(0, 54, buf);
+    snprintf(buffer, sizeof(buffer), "Jitter:%3dms", stats.jitter);
+    driver->text(0, 54, buffer);
 
-    d->hline(0, 57, ScreenDriver::W);
-    d->font(ScreenFont::Tiny);
-    d->text(0, 63, "SW1:exit  SW2:reset");
+    driver->hline(0, 57, ScreenDriver::W);
+    driver->font(ScreenFont::Tiny);
+    driver->text(0, 63, "SW1:exit  SW2:reset");
 
-    d->flush();
+    driver->flush();
 }

@@ -9,66 +9,66 @@ static const char SPINNER_CHARS[] = { '|', '/', '-', '\\' };
 static const uint8_t SPINNER_COUNT = sizeof(SPINNER_CHARS);
 
 void WifiScanScreen::showScanning() {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "WIFI ANALYSIS");
-    d->hline(0, 13, ScreenDriver::W);
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "WIFI ANALYSIS");
+    driver->hline(0, 13, ScreenDriver::W);
 
-    d->font(ScreenFont::Small);
-    d->text(0, 28, "Scanning 2.4GHz...");
-    snprintf(buf, sizeof(buf), "  [%c] Please wait", SPINNER_CHARS[_spinnerFrame % SPINNER_COUNT]);
-    d->text(0, 40, buf);
+    driver->font(ScreenFont::Small);
+    driver->text(0, 28, "Scanning 2.4GHz...");
+    snprintf(buffer, sizeof(buffer), "  [%c] Please wait", SPINNER_CHARS[_spinnerFrame % SPINNER_COUNT]);
+    driver->text(0, 40, buffer);
     _spinnerFrame++;
 
-    d->hline(0, 55, ScreenDriver::W);
-    d->font(ScreenFont::Tiny);
-    d->text(0, 63, "Checking all channels");
+    driver->hline(0, 55, ScreenDriver::W);
+    driver->font(ScreenFont::Tiny);
+    driver->text(0, 63, "Checking all channels");
 
-    d->flush();
+    driver->flush();
 }
 
 void WifiScanScreen::showResult(const ChannelScanResult& result, int countdownSecs, bool broadcasting) {
-    ScreenDriver* d = getScreenDriver();
-    if (!d) return;
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
-    char buf[32];
-    d->clear();
+    char buffer[32];
+    driver->clear();
 
-    d->font(ScreenFont::Medium);
-    d->text(0, 10, "WIFI ANALYSIS");
-    d->hline(0, 13, ScreenDriver::W);
+    driver->font(ScreenFont::Medium);
+    driver->text(0, 10, "WIFI ANALYSIS");
+    driver->hline(0, 13, ScreenDriver::W);
 
-    d->font(ScreenFont::Small);
+    driver->font(ScreenFont::Small);
 
-    snprintf(buf, sizeof(buf), "Channel:  %d", result.bestChannel);
-    d->text(0, 24, buf);
+    snprintf(buffer, sizeof(buffer), "Channel:  %d", result.bestChannel);
+    driver->text(0, 24, buffer);
 
-    snprintf(buf, sizeof(buf), "Quality:  %s", result.qualityLabel);
-    d->text(0, 34, buf);
+    snprintf(buffer, sizeof(buffer), "Quality:  %s", result.qualityLabel);
+    driver->text(0, 34, buffer);
 
-    snprintf(buf, sizeof(buf), "APs seen: %d total", result.totalApCount);
-    d->text(0, 44, buf);
+    snprintf(buffer, sizeof(buffer), "APs seen: %d total", result.totalApCount);
+    driver->text(0, 44, buffer);
 
     if (broadcasting) {
-        snprintf(buf, sizeof(buf), ">Syncing car ch %d...", result.bestChannel);
+        snprintf(buffer, sizeof(buffer), ">Syncing car ch %d...", result.bestChannel);
     } else {
-        snprintf(buf, sizeof(buf), "Ch load:  %d APs", result.channelApCount);
+        snprintf(buffer, sizeof(buffer), "Ch load:  %d APs", result.channelApCount);
     }
-    d->text(0, 54, buf);
+    driver->text(0, 54, buffer);
 
-    d->hline(0, 57, ScreenDriver::W);
-    d->font(ScreenFont::Tiny);
+    driver->hline(0, 57, ScreenDriver::W);
+    driver->font(ScreenFont::Tiny);
     if (broadcasting) {
-        snprintf(buf, sizeof(buf), "%ds  Bcasting  [SW:skip]", countdownSecs);
+        snprintf(buffer, sizeof(buffer), "%ds  Bcasting  [SW:skip]", countdownSecs);
     } else {
-        snprintf(buf, sizeof(buf), "%ds  [SW: skip]", countdownSecs);
+        snprintf(buffer, sizeof(buffer), "%ds  [SW: skip]", countdownSecs);
     }
-    d->text(0, 63, buf);
+    driver->text(0, 63, buffer);
 
-    d->flush();
+    driver->flush();
 }

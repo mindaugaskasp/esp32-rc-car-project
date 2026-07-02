@@ -18,8 +18,8 @@
 // Joystick X axis calibration. Push the stick to each extreme and read the ADC
 // value from the Serial log (logged as "joy x=<value>"), then set these to match.
 // Default values are conservative — calibrating improves full-range servo travel.
-#define JOYSTICK_X_MIN  100   // ADC at full left deflection
-#define JOYSTICK_X_MAX  3950  // ADC at full right deflection
+#define JOYSTICK_X_MIN 100 // ADC at full left deflection
+#define JOYSTICK_X_MAX 3950 // ADC at full right deflection
 
 // Steering servo pulse range. Tune center trim if the wheels are not straight
 // when the joystick is centered. Positive values move one direction, negative

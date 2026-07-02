@@ -21,6 +21,6 @@ inline int computeMotorRpm(uint32_t pulseCount, unsigned long elapsedMs,
                            int pulsesPerRev = HALL_PULSES_PER_REV,
                            uint32_t minPulses = HALL_MIN_PULSES_FOR_RPM) {
     if (elapsedMs == 0 || pulsesPerRev <= 0) return 0;
-    if (pulseCount < minPulses)              return 0;
+    if (pulseCount < minPulses) return 0;
     return (int)(pulseCount * 60000UL / ((uint32_t)pulsesPerRev * (uint32_t)elapsedMs));
 }

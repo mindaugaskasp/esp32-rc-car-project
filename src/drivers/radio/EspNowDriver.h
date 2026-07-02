@@ -4,5 +4,5 @@
 
 void sendData(VehicleData data, const uint8_t* mac);
 void initEspNow();
-void addPeer(const uint8_t* macAddr);
+void addPeer(const uint8_t* macAddress);
 void printMacAddress();
