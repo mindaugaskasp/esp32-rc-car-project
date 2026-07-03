@@ -1,9 +1,9 @@
 #include "ServoDriver.h"
 #include "ServoLogic.h"
-#include <config/Esp32Pins.h>
+#include <config/controller/Esp32Pins.h>
 #include <ESP32Servo.h>
 
-Servo servo;
+static Servo servo;
 
 static int currentServoMicros = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;
 

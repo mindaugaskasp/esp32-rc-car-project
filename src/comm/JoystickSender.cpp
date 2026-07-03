@@ -1,6 +1,7 @@
 #include "JoystickSender.h"
 #include "config/ControlConfig.h"
 #include "drivers/debug/DebugLogger.h"
+#include "drivers/debug/PacketTrace.h"
 #include "drivers/radio/EspNowDriver.h"
 #include <Arduino.h>
 
@@ -33,8 +34,12 @@ void JoystickSender::send(int joystickX, int joystickY, int centerRaw, const uin
     if (quickUpdate || repeatSend || changedSinceLastSend || directionChanged) {
         debugLogger.logJoystick(joystickX, joystickY);
         _prevJoyX = joystickX; _prevJoyY = joystickY;
-        VehicleData data = {joystickX, joystickY, (uint32_t)millis()};
+        VehicleData data = {joystickX, joystickY, static_cast<uint32_t>(millis())};
         sendData(data, mac);
+        if (isPacketTraceEnabled()) {
+            debugLogger.logf("[TRACE] TX cmd x=%d y=%d ts=%lu",
+                             joystickX, joystickY, static_cast<unsigned long>(data.txTimestampMs));
+        }
         _sentCount++;
         _lastSentX = joystickX; _lastSentY = joystickY;
         _lastSendTime = now;

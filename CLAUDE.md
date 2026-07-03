@@ -20,16 +20,21 @@ src/
 ├── main_transmitter.cpp          # Transmitter entry point — TxMode state machine + setup()/loop() only
 ├── main_receiver.cpp             # Receiver entry point — setup()/loop() only
 ├── config/
-│   ├── ControlConfig.h           # Joystick calibration, servo/ESC tuning constants
+│   ├── ControlConfig.h           # Umbrella — includes the four tuning files below
+│   ├── JoystickConfig.h          # Stick centers, deadzones, inversion, travel endpoints (X & Y)
+│   ├── ServoConfig.h             # Steering-servo PWM range, smoothing, jitter deadband
+│   ├── EscConfig.h               # ESC output deadband, throttle-invert
+│   ├── HallConfig.h              # Hall speed-sensor pulses/rev, RPM window, debounce
 │   ├── DebugConfig.h             # Per-subsystem debug flags and macros
-│   ├── Esp32Pins.h               # Includes the board-specific pin file below by IS_TRANSMITTER/IS_RECEIVER
-│   ├── Esp32PinsTransmitter.h    # Transmitter GPIO pin assignments
-│   ├── Esp32PinsReceiver.h       # Receiver GPIO pin assignments
-│   └── WifiConfig.h              # MAC addresses, ESP-NOW config
+│   ├── WifiConfig.h              # MAC addresses, ESP-NOW config
+│   └── controller/               # Board pin maps (hardware wiring, kept apart from tuning)
+│       ├── Esp32Pins.h           # Includes the board-specific pin file below by IS_TRANSMITTER/IS_RECEIVER
+│       ├── Esp32PinsTransmitter.h # Transmitter GPIO pin assignments
+│       └── Esp32PinsReceiver.h   # Receiver GPIO pin assignments
 │
 ├── drivers/                      # L0 — ONLY code that touches a peripheral directly
 │   ├── controls/                 # Joystick ADC sampling + buttons
-│   ├── debug/                    # Serial logging (DebugLogger) + Esp32SysInfo
+│   ├── debug/                    # Serial logging (DebugLogger) + Esp32SysInfo + PacketTrace (tx runtime trace gate)
 │   ├── radio/
 │   │   └── EspNowDriver.h/cpp    # ESP-NOW init, peer management, raw send/receive
 │   ├── display/
@@ -103,7 +108,7 @@ void updateServo(int rawX);
 ```cpp
 #include "ServoDriver.h"
 #include "ServoLogic.h"
-#include <config/Esp32Pins.h>
+#include <config/controller/Esp32Pins.h>
 #include <ESP32Servo.h>
 
 static Servo servo;
@@ -158,7 +163,18 @@ constexpr int ESC_PIN = 13;
 #define SERVO_PIN 32   // no type safety, no scoping
 ```
 
-Exception: `ControlConfig.h` uses `#define` for constants shared between the native test environment and Arduino builds. This is acceptable because Arduino's `constexpr` support can be unreliable across toolchain versions; keep these as `#define` until verified otherwise.
+Exception: the control-tuning config files use `#define` for constants shared between the native test environment and Arduino builds. This is acceptable because Arduino's `constexpr` support can be unreliable across toolchain versions; keep these as `#define` until verified otherwise.
+
+### Group related configs; one file per subsystem
+A config file must cover exactly one subsystem, so the relationship between its values is
+obvious from proximity and the file reads as a coherent unit. When a config file starts mixing
+unrelated concerns, split it by subsystem (as `ControlConfig.h` was split into
+`JoystickConfig.h`, `ServoConfig.h`, `EscConfig.h`, `HallConfig.h`) and keep a thin umbrella
+header (`ControlConfig.h`) that only `#include`s the parts, so existing include sites and a
+future aggregate reference keep working. Keep values that are tuned or read together adjacent
+within the file; when a constant in one file constrains one in another, cross-reference it by
+name in a short comment rather than separating them silently. Board pin maps are hardware, not
+tuning — they live under `config/controller/`, apart from the tuning files.
 
 ### No column-alignment padding — single spaces only
 Use exactly one space around `=` and one space between a type and its identifier. Do **not**
@@ -187,9 +203,12 @@ static const int JOYSTICK_CENTER_RAW = 2048;
 if (rawY > 1900 && rawY < 2200) ...  // bad — these should be named constants too
 ```
 
-### Pin Configuration (`config/Esp32Pins.h`)
+### Pin Configuration (`config/controller/Esp32Pins.h`)
 All GPIO pin numbers as `const int`. Descriptive names: `DEVICE_PIN` format.
-The canonical file is `src/config/Esp32Pins.h` — the only copy; the stale `include/` directory has been removed.
+The canonical file is `src/config/controller/Esp32Pins.h` — the only copy; it selects the
+board-specific pin file (`Esp32PinsTransmitter.h` / `Esp32PinsReceiver.h`, its siblings) by
+`IS_TRANSMITTER` / `IS_RECEIVER`. Board pin maps live under `config/controller/` to keep
+hardware wiring separate from the tuning configs.
 
 ### Debug Configuration (`config/DebugConfig.h`)
 Boolean flags per subsystem with tagged macros. Flag the build down to zero overhead when disabled.
@@ -230,6 +249,34 @@ enum class EscMotorDirection : uint8_t { PositiveRotation = 1, Reversal = 2 };
 // Avoid
 enum EscMotorDirection { POSITIVE_ROTATION, REVERSAL };
 ```
+
+---
+
+## Comments — code must speak for itself
+
+Comments are a last resort, not a habit. Make the code self-explanatory first: expressive
+names, named constants instead of magic numbers, small well-named helpers, and clear control
+flow carry the meaning. A comment is warranted **only when the intent cannot be conveyed by the
+code itself** — the *why* behind a non-obvious choice: hardware quirks, protocol/timing
+constraints, ISR-safety reasons, a workaround, or a cross-file invariant.
+
+Banned:
+- Comments that restate the code (`i++; // increment i`, `// set the servo angle` above `setServoAngle(...)`).
+- Narrating the obvious, or a comment on every line/field. If a name would remove the comment, rename instead of commenting.
+- Verbose banners and paragraphs where one short line (or nothing) would do.
+
+```cpp
+// Bad — restates the code, adds nothing
+// loop over all APs and add their score to the channel
+for (int apIndex = 0; apIndex < numAPs; apIndex++) { ... }
+
+// Good — the code is clear on its own; comment only the non-obvious reason
+// scanNetworks() must run before esp_now_init(): an active ESP-NOW session returns 0 APs.
+int numAPs = WiFi.scanNetworks(false, true);
+```
+
+Prefer deleting a comment and improving the code over keeping an explanatory comment. Keep the
+ones that capture a *why* a future reader could not recover from the code.
 
 ---
 
@@ -362,7 +409,7 @@ Prefer non-blocking timing (`millis()` deltas) everywhere else.
 ```cpp
 #include "EscDriver.h"          // own header first
 #include "EscLogic.h"           // companion logic header
-#include <config/Esp32Pins.h>   // project config
+#include <config/controller/Esp32Pins.h>   // project config
 #include <ESP32Servo.h>         // external library
 ```
 
@@ -447,7 +494,7 @@ Only pure logic is testable natively. The rule is:
 4. Create `DriverName.cpp` — include own header first, all state `static`
 5. Add `#include "drivers/category/DriverName.h"` in the relevant main file
 6. Call `init{Driver}()` in `setup()`
-7. Add pins to `config/Esp32Pins.h` if needed
+7. Add pins to `config/controller/Esp32Pins.h` if needed
 8. Add debug macros to `config/DebugConfig.h` if needed
 9. Add library to `platformio.ini` if needed
 10. Write tests for any `*Logic.h` functions
@@ -480,6 +527,7 @@ directory with cross-board files, as in `comm/`.
 | `drivers/hall/` | transmitter |
 | `comm/VehicleCommandReceiver.cpp` | transmitter |
 | `drivers/display/` | receiver |
+| `drivers/debug/PacketTrace.cpp` | receiver |
 | `comm/ChannelSync.cpp` | receiver |
 | `comm/TelemetryLink.cpp` | receiver |
 | `comm/JoystickSender.cpp` | receiver |

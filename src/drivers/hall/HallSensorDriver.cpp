@@ -1,6 +1,6 @@
 #include "HallSensorDriver.h"
 #include "HallLogic.h"
-#include "config/Esp32Pins.h"
+#include "config/controller/Esp32Pins.h"
 #include "config/ControlConfig.h"
 #include <Arduino.h>
 

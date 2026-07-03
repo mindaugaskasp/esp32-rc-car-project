@@ -7,10 +7,10 @@
 class WifiPingMode {
 public:
     // Resets all stats. Call both when entering this mode and to manually
-    // reset the running stats (SW2) while already in it.
+    // reset the running stats (SW1) while already in it.
     void begin();
     void update();
-    // Returns true (once) when the user requests exit via SW1.
+    // Returns true (once) when the user requests exit via SW2.
     bool wantsExit();
 
 private:

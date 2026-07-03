@@ -1,4 +1,5 @@
 #include "EspNowDriver.h"
+#include "config/WifiConfig.h"
 #include <esp_now.h>
 #include <WiFi.h>
 #include "drivers/debug/DebugLogger.h"
@@ -29,23 +30,24 @@ void initEspNow() {
 }
 
 
+void formatMac(char* out, const uint8_t* mac) {
+    snprintf(out, MAC_STRING_BUFFER_SIZE, "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 void addPeer(const uint8_t* macAddress) {
     esp_now_peer_info_t peerInfo = {};
-    memcpy(peerInfo.peer_addr, macAddress, 6);
+    memcpy(peerInfo.peer_addr, macAddress, MAC_ADDRESS_LENGTH);
     peerInfo.channel = 0;
     peerInfo.ifidx = WIFI_IF_STA;
     peerInfo.encrypt = false;
-    
+
     esp_err_t peerResult = esp_now_add_peer(&peerInfo);
+    char peerMac[MAC_STRING_BUFFER_SIZE];
+    formatMac(peerMac, macAddress);
     if (peerResult != ESP_OK) {
-        char peerMac[18];
-        snprintf(peerMac, sizeof(peerMac), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
         debugLogger.logf("Failed to add peer %s: %s (%d)", peerMac, espNowErrorToString(peerResult), peerResult);
     } else {
-        char peerMac[18];
-        snprintf(peerMac, sizeof(peerMac), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
         debugLogger.logf("Peer added: %s", peerMac);
     }
 }
@@ -61,10 +63,17 @@ void printMacAddress() {
 }
 
 #ifdef IS_TRANSMITTER
+static unsigned long lastSendTimeMs = 0;
+
 void sendData(VehicleData data, const uint8_t* mac) {
     esp_err_t result = esp_now_send(mac, reinterpret_cast<const uint8_t*>(&data), sizeof(data));
     if (result != ESP_OK) {
         debugLogger.logf("ESP-NOW send failed: %d", result);
     }
+    lastSendTimeMs = millis();
+}
+
+unsigned long millisSinceLastSend() {
+    return millis() - lastSendTimeMs;
 }
 #endif

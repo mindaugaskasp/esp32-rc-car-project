@@ -56,7 +56,7 @@ void DashboardMode::updateLinkStats(bool newTelemetry) {
         uint32_t rxInWindow = rxCount - _lossWindowRxBase;
         if (sentInWindow > 0) {
             uint32_t lostInWindow = (rxInWindow < sentInWindow) ? (sentInWindow - rxInWindow) : 0;
-            _lossPercent = (int)(lostInWindow * 100 / sentInWindow);
+            _lossPercent = static_cast<int>(lostInWindow * 100 / sentInWindow);
         }
         _lossWindowStart = now;
         _lossWindowSentBase = sentCount;

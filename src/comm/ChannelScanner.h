@@ -13,8 +13,10 @@ struct ChannelScanResult {
 };
 
 // Scans all 2.4GHz channels and returns the least congested one.
-// WiFi must be in WIFI_STA mode (i.e. call after initEspNow()).
-// progressCallback is invoked every ~200ms during the async scan.
+// Switches WiFi to WIFI_STA mode internally. MUST be called BEFORE initEspNow() —
+// an active ESP-NOW session makes the scan return 0 APs on every channel.
+// progressCallback is invoked once per channel during the scan (drives the
+// scan-screen spinner); the scan is synchronous, one channel at a time.
 ChannelScanResult scanForBestChannel(void (*progressCallback)() = nullptr);
 
 // Sets the active WiFi channel for ESP-NOW. Call before addPeer().

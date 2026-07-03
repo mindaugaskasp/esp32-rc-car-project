@@ -1,6 +1,7 @@
 #include "ModeSelectMenu.h"
 #include "drivers/display/ScreenDriver.h"
-#include "config/Esp32Pins.h"
+#include "config/controller/Esp32Pins.h"
+#include "config/ControlConfig.h"
 #include "drivers/controls/Controls.h"
 #include <Arduino.h>
 #include <stdio.h>
@@ -10,6 +11,16 @@ ModeSelectMenu modeSelectMenu;
 void ModeSelectMenu::setEntries(const char* const* names, int8_t count) {
     _names = names;
     _count = count;
+}
+
+void ModeSelectMenu::onOpen() {
+    _sw1Was = readButton(JOY1_SW_PIN);
+    _sw2Was = readButton(JOY2_SW_PIN);
+}
+
+void ModeSelectMenu::onClose() {
+    _openJoy1SwWas = readButton(JOY1_SW_PIN);
+    _openJoy2SwWas = readButton(JOY2_SW_PIN);
 }
 
 bool ModeSelectMenu::checkOpenRequest() {
@@ -38,14 +49,14 @@ void ModeSelectMenu::show() {
     if (below) driver->scrollText(48, below);
     driver->hline(0, 52, ScreenDriver::W);
     driver->font(ScreenFont::Tiny);
-    driver->text(0, 60, "Y:nav  SW2:select  SW1:back");
+    driver->text(0, 60, "Y:nav  SW1:select  SW2:back");
     driver->flush();
 }
 
 ModeSelectMenu::Result ModeSelectMenu::update(int joystickY) {
     unsigned long now = millis();
-    bool yUp = joystickY > 3500;
-    bool yDown = joystickY < 500;
+    bool yUp = joystickY > JOY_GESTURE_UP_RAW;
+    bool yDown = joystickY < JOY_GESTURE_DOWN_RAW;
     bool sw1 = readButton(JOY1_SW_PIN);
     bool sw2 = readButton(JOY2_SW_PIN);
 
@@ -62,10 +73,10 @@ ModeSelectMenu::Result ModeSelectMenu::update(int joystickY) {
     }
 
     Result result = Result::None;
-    if (sw2 && !_sw2Was) { // SW2 (throttle stick) = select/confirm
+    if (sw1 && !_sw1Was) { // SW1 (throttle stick) = select/confirm
         result = Result::Selected;
     }
-    if (sw1 && !_sw1Was) { // SW1 (steering stick) = back/cancel
+    if (sw2 && !_sw2Was) { // SW2 (steering stick) = back/cancel
         result = Result::Cancelled;
     }
 

@@ -63,7 +63,7 @@ void Screen::showDashboard(const DashboardData& dashboard) {
 #if DEBUG_DASHBOARD_LINK_STATS
     // Rotate the single indicator slot between latency / loss / jitter so all
     // three fit without crowding the battery row.
-    int statSlot = (int)((millis() / DASHBOARD_STAT_DWELL_MS) % 3);
+    int statSlot = static_cast<int>((millis() / DASHBOARD_STAT_DWELL_MS) % 3);
     if (statSlot == 1 && dashboard.lossPercent >= 0) {
         snprintf(buffer, sizeof(buffer), "L:%d%%", dashboard.lossPercent);
     } else if (statSlot == 2 && dashboard.jitterMs >= 0) {
@@ -83,7 +83,7 @@ void Screen::showDashboard(const DashboardData& dashboard) {
 
     // ── Menu hint (tiny, right-aligned in the gap above speed) ───────────────
     driver->font(ScreenFont::Tiny);
-    driver->text(ScreenDriver::W - driver->textW("SW2:menu"), 20, "SW2:menu");
+    driver->text(ScreenDriver::W - driver->textW("SW1:menu"), 20, "SW1:menu");
 
     // ── Speed ────────────────────────────────────────────────────────────────
     driver->font(ScreenFont::Large);

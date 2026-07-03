@@ -1,4 +1,9 @@
 #include "VehicleCommandReceiver.h"
+#include "drivers/radio/EspNowDriver.h"
+#include "comm/ChannelAdvertiser.h"
+#include "comm/ChannelScanner.h"
+#include "config/DebugConfig.h"
+#include "config/WifiConfig.h"
 #include "drivers/servo/ServoDriver.h"
 #include "drivers/esc/EscDriver.h"
 #include "drivers/hall/HallSensorDriver.h"
@@ -12,10 +17,30 @@ static void onVehicleDataReceiveTrampoline(const uint8_t* mac, const uint8_t* in
 }
 
 void VehicleCommandReceiver::begin() {
+    _operationalChannel = getSelectedChannel();
+    _lastPacketTime = millis(); // measure link loss from begin(), even before the first command
     esp_now_register_recv_cb(onVehicleDataReceiveTrampoline);
 }
 
 void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* incomingData, int len) {
+    // A channel advertisement means the transmitter (re)started and is announcing
+    // its channel. Stash it for update() to adopt; it is not a driving command, so
+    // it must not refresh the packet-loss timer.
+    uint8_t advertisedChannel = 0;
+    if (tryParseChannelAdvertisement(mac, incomingData, len, TRANSMITTER_MAC, &advertisedChannel)) {
+        portENTER_CRITICAL(&_mux);
+        _resyncChannel = advertisedChannel;
+        _resyncChannelPending = true;
+        portEXIT_CRITICAL(&_mux);
+        return;
+    }
+
+    // Safety: only the paired transmitter may command the vehicle. Dropping any
+    // other sender here means stray ESP-NOW traffic can never drive the ESC or
+    // servo, and it never refreshes the packet-loss timer — so an absent
+    // transmitter leaves the watchdog to hold the ESC at neutral.
+    if (memcmp(mac, TRANSMITTER_MAC, MAC_ADDRESS_LENGTH) != 0) return;
+
     unsigned long receivedAt = millis();
     size_t copyLength = 0;
     if (len > 0) {
@@ -38,20 +63,33 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
 
 void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& data) {
     setServoAngle(data.servoPosition);
-    updateEscSpeed(data.escSpeed);
+
+    // Failsafe arming: the ESC is held at neutral until a short run of valid
+    // commands has arrived, and re-armed from zero after every packet-loss
+    // timeout (see update()). This guarantees the motor cannot spin from a
+    // single stray in-range packet or on the first frame after a dropout —
+    // steering stays live throughout, only propulsion is gated.
+    if (_consecutiveValidCommands < ARM_COMMAND_THRESHOLD) {
+        _consecutiveValidCommands++;
+        setEscNeutral();
+    } else {
+        updateEscSpeed(data.escSpeed);
+    }
 
     TelemetryData telemetry;
     telemetry.batteryVoltage = 7.4f; // TODO: replace with ADC voltage divider reading
     telemetry.speedRpm = getMotorRpm();
     telemetry.echoTimestampMs = data.txTimestampMs;
 
-    debugLogger.logf("Received data: servo=%d esc=%d", data.servoPosition, data.escSpeed);
+    if (DEBUG_PACKET_TRACE) {
+        debugLogger.logf("Received data: servo=%d esc=%d", data.servoPosition, data.escSpeed);
+    }
 
     esp_err_t result = esp_now_send(mac, reinterpret_cast<const uint8_t*>(&telemetry), sizeof(telemetry));
-    if (result == ESP_OK) {
-        debugLogger.log("Telemetry packet sent back to sender");
-    } else {
+    if (result != ESP_OK) {
         debugLogger.logf("Telemetry send failed: %d", result);
+    } else if (DEBUG_PACKET_TRACE) {
+        debugLogger.log("Telemetry packet sent back to sender");
     }
 }
 
@@ -68,13 +106,14 @@ void VehicleCommandReceiver::update() {
     portEXIT_CRITICAL(&_mux);
 
     if (packetAvailable) {
-        char peerMac[18];
-        snprintf(peerMac, sizeof(peerMac), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 packet.mac[0], packet.mac[1], packet.mac[2], packet.mac[3], packet.mac[4], packet.mac[5]);
-        debugLogger.logf("Packet received from: %s, len=%d", peerMac, packet.len);
+        if (DEBUG_PACKET_TRACE) {
+            char peerMac[MAC_STRING_BUFFER_SIZE];
+            formatMac(peerMac, packet.mac);
+            debugLogger.logf("Packet received from: %s, len=%d", peerMac, packet.len);
 
-        const char* packetType = (packet.len == sizeof(VehicleData)) ? "VehicleData" : "Unknown";
-        debugLogger.logf("Packet type: %s", packetType);
+            const char* packetType = (packet.len == sizeof(VehicleData)) ? "VehicleData" : "Unknown";
+            debugLogger.logf("Packet type: %s", packetType);
+        }
 
         if (packet.len == sizeof(VehicleData)) {
             VehicleData data;
@@ -84,6 +123,30 @@ void VehicleCommandReceiver::update() {
     }
 
     unsigned long now = millis();
+
+    // Adopt a channel learned from a fresh advertisement (transmitter restarted,
+    // possibly on a new channel). Peer channel is 0, so it follows the WiFi channel.
+    bool adoptChannel = false;
+    uint8_t newChannel = 0;
+    portENTER_CRITICAL(&_mux);
+    if (_resyncChannelPending) {
+        adoptChannel = true;
+        newChannel = _resyncChannel;
+        _resyncChannelPending = false;
+    }
+    portEXIT_CRITICAL(&_mux);
+
+    if (adoptChannel) {
+        debugLogger.logf("[RESYNC] Advertisement heard: channel %d (was %d)", newChannel, _operationalChannel);
+        _operationalChannel = newChannel;
+        applyWifiChannel(newChannel);
+        _listeningForResync = false;
+        portENTER_CRITICAL(&_mux);
+        _lastPacketTime = now; // give the resynced link time before re-triggering resync
+        portEXIT_CRITICAL(&_mux);
+        return; // ESC stays neutral until a real command arrives on the new channel
+    }
+
     bool shouldResetEsc = false;
 
     portENTER_CRITICAL(&_mux);
@@ -94,7 +157,47 @@ void VehicleCommandReceiver::update() {
     portEXIT_CRITICAL(&_mux);
 
     if (shouldResetEsc) {
+        _consecutiveValidCommands = 0; // require re-arming before propulsion resumes
         setEscNeutral();
         debugLogger.log("No ESP-NOW packet received recently; ESC reset to neutral");
+    }
+
+    updateResync(now);
+}
+
+void VehicleCommandReceiver::updateResync(unsigned long now) {
+    unsigned long lastPacket;
+    portENTER_CRITICAL(&_mux);
+    lastPacket = _lastPacketTime;
+    portEXIT_CRITICAL(&_mux);
+
+    bool linkLost = (now - lastPacket) > RESYNC_AFTER_LOSS_MS;
+
+    if (!linkLost) {
+        // Link healthy — make sure we're back on the operational channel if a
+        // previous resync cycle left us listening.
+        if (_listeningForResync) {
+            applyWifiChannel(_operationalChannel);
+            _listeningForResync = false;
+        }
+        return;
+    }
+
+    // Link lost long enough: alternate between listening on the advertisement
+    // channel (to catch a transmitter that moved channels) and serving on the
+    // operational channel (to catch one that resumes on the same channel).
+    if (_listeningForResync) {
+        if (now - _resyncPhaseStart >= RESYNC_LISTEN_MS) {
+            applyWifiChannel(_operationalChannel);
+            _listeningForResync = false;
+            _resyncPhaseStart = now;
+        }
+    } else {
+        if (now - _resyncPhaseStart >= RESYNC_SERVE_MS) {
+            applyWifiChannel(ADVERTISEMENT_CHANNEL);
+            _listeningForResync = true;
+            _resyncPhaseStart = now;
+            debugLogger.logf("[RESYNC] Link down — listening on ch %d for advertisement", ADVERTISEMENT_CHANNEL);
+        }
     }
 }

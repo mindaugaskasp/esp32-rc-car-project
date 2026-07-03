@@ -1,13 +1,14 @@
 #include "TelemetryLink.h"
 #include "config/DebugConfig.h"
 #include "drivers/debug/DebugLogger.h"
+#include "drivers/debug/PacketTrace.h"
 #include <esp_now.h>
 
 TelemetryLink telemetryLink;
 
 static uint32_t hashTelemetry(const TelemetryData& telemetry) {
-    uint32_t voltagePart = (uint32_t)(telemetry.batteryVoltage * 100.0f + 0.5f);
-    return (voltagePart << 16) | (uint32_t)(telemetry.speedRpm & 0xFFFF);
+    uint32_t voltagePart = static_cast<uint32_t>(telemetry.batteryVoltage * 100.0f + 0.5f);
+    return (voltagePart << 16) | static_cast<uint32_t>(telemetry.speedRpm & 0xFFFF);
 }
 
 static void onTelemetryReceiveTrampoline(const uint8_t* mac, const uint8_t* incomingData, int len) {
@@ -27,7 +28,7 @@ void TelemetryLink::handleReceive(const uint8_t* mac, const uint8_t* incomingDat
 
     uint32_t now = millis();
     int rtt = (t.echoTimestampMs > 0 && now >= t.echoTimestampMs)
-              ? (int)(now - t.echoTimestampMs)
+              ? static_cast<int>(now - t.echoTimestampMs)
               : -1;
 
     portENTER_CRITICAL(&_mux);
@@ -62,6 +63,12 @@ bool TelemetryLink::process() {
 
     _latest = received;
     _lastHash = hash;
+
+    if (isPacketTraceEnabled()) {
+        debugLogger.logf("[TRACE] RX telem %.2fV %d RPM echo=%lu",
+                         received.batteryVoltage, received.speedRpm,
+                         static_cast<unsigned long>(received.echoTimestampMs));
+    }
 
     unsigned long now = millis();
     if (now - _lastLogTime >= DEBUG_LOG_MIN_INTERVAL_MS) {

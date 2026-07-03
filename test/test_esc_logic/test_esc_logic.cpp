@@ -7,58 +7,49 @@ void tearDown() {}
 // --- Endpoints ---
 
 void test_full_brake_returns_min() {
-    TEST_ASSERT_EQUAL(ESC_MIN_MICROS, computeEscMicros(0));
+    TEST_ASSERT_EQUAL(ESC_MIN_MICROS, computeEscMicros(THROTTLE_JOY_MIN));
 }
 
 void test_full_throttle_returns_max() {
-    TEST_ASSERT_EQUAL(ESC_MAX_MICROS, computeEscMicros(4095));
+    TEST_ASSERT_EQUAL(ESC_MAX_MICROS, computeEscMicros(THROTTLE_JOY_MAX));
 }
 
-// --- Deadzone ---
+// --- Deadzone (symmetric around the measured throttle center) ---
 
-void test_center_is_in_deadzone() {
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(2048));
+void test_center_is_neutral() {
+    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW));
 }
 
-void test_deadzone_lower_edge_is_neutral() {
-    // rawY=1901: 1901 > 1900 && 1901 < 2200 -> neutral
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(1901));
+// Regression: the joystick rests near THROTTLE_CENTER_RAW, not the nominal 2048.
+// Every value in the observed resting-jitter window must map to neutral so the
+// motor stays stopped at rest (previously ~2225 fell outside the old band and the
+// motor idled forward).
+void test_resting_jitter_stays_neutral() {
+    for (int rawY = 2222; rawY <= 2231; rawY++) {
+        TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(rawY));
+    }
 }
 
-void test_deadzone_upper_edge_is_neutral() {
-    // rawY=2199: 2199 > 1900 && 2199 < 2200 -> neutral
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(2199));
+void test_deadzone_edges_are_neutral() {
+    // diff == JOY_DEADZONE_Y is NOT outside the deadzone (condition is diff > deadzone)
+    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + JOY_DEADZONE_Y));
+    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - JOY_DEADZONE_Y));
 }
 
-void test_boundary_1900_not_in_deadzone() {
-    // Condition is rawY > 1900, so 1900 itself is NOT in deadzone
-    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(1900));
-}
-
-void test_boundary_2200_not_in_deadzone() {
-    // Condition is rawY < 2200, so 2200 itself is NOT in deadzone
-    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(2200));
-}
-
-void test_neutral_band_edges_track_named_constants() {
-    // The neutral band is (ESC_NEUTRAL_JOY_LOW, ESC_NEUTRAL_JOY_HIGH), open interval.
-    // Just inside each edge -> neutral; the edges themselves -> not neutral.
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_LOW + 1));
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_HIGH - 1));
-    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_LOW));
-    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_HIGH));
+void test_just_outside_deadzone_is_not_neutral() {
+    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + JOY_DEADZONE_Y + 1));
+    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - JOY_DEADZONE_Y - 1));
 }
 
 // --- Bidirectional mapping: below-center is reverse, above-center is forward ---
 
 void test_below_center_is_reverse() {
-    // Anything below the neutral band (and outside it) maps below neutral (braking/reverse).
-    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_LOW));
+    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - JOY_DEADZONE_Y - 1));
     TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(500));
 }
 
 void test_above_center_is_forward() {
-    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(ESC_NEUTRAL_JOY_HIGH));
+    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + JOY_DEADZONE_Y + 1));
     TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(3500));
 }
 
@@ -75,15 +66,26 @@ void test_over_range_input_clamped_to_max() {
 }
 
 // --- Specific mapped values (integer arithmetic matches Arduino map()) ---
+// Expected values are derived from the config constants, not hardcoded, so they
+// stay correct when THROTTLE_CENTER_RAW is recalibrated. They still pin the mapping
+// to the exact Arduino map() integer arithmetic on each side of center.
 
-void test_known_value_below_deadzone() {
-    // map(1000, 0, 4095, 1100, 1900): 1000*800/4095 + 1100 = 195 + 1100 = 1295
-    TEST_ASSERT_EQUAL(1295, computeEscMicros(1000));
+static int expectedBelowCenter(int rawY) {
+    return (int)((long)(rawY - THROTTLE_JOY_MIN) * (ESC_NEUTRAL_MICROS - ESC_MIN_MICROS)
+           / (THROTTLE_CENTER_RAW - THROTTLE_JOY_MIN)) + ESC_MIN_MICROS;
 }
 
-void test_known_value_above_deadzone() {
-    // map(3000, 0, 4095, 1100, 1900): 3000*800/4095 + 1100 = 586 + 1100 = 1686
-    TEST_ASSERT_EQUAL(1686, computeEscMicros(3000));
+static int expectedAboveCenter(int rawY) {
+    return (int)((long)(rawY - THROTTLE_CENTER_RAW) * (ESC_MAX_MICROS - ESC_NEUTRAL_MICROS)
+           / (THROTTLE_JOY_MAX - THROTTLE_CENTER_RAW)) + ESC_NEUTRAL_MICROS;
+}
+
+void test_known_value_below_center() {
+    TEST_ASSERT_EQUAL(expectedBelowCenter(1000), computeEscMicros(1000));
+}
+
+void test_known_value_above_center() {
+    TEST_ASSERT_EQUAL(expectedAboveCenter(3000), computeEscMicros(3000));
 }
 
 // --- Output always in valid PWM range ---
@@ -100,18 +102,16 @@ int main(int argc, char **argv) {
     UNITY_BEGIN();
     RUN_TEST(test_full_brake_returns_min);
     RUN_TEST(test_full_throttle_returns_max);
-    RUN_TEST(test_center_is_in_deadzone);
-    RUN_TEST(test_deadzone_lower_edge_is_neutral);
-    RUN_TEST(test_deadzone_upper_edge_is_neutral);
-    RUN_TEST(test_boundary_1900_not_in_deadzone);
-    RUN_TEST(test_boundary_2200_not_in_deadzone);
-    RUN_TEST(test_neutral_band_edges_track_named_constants);
+    RUN_TEST(test_center_is_neutral);
+    RUN_TEST(test_resting_jitter_stays_neutral);
+    RUN_TEST(test_deadzone_edges_are_neutral);
+    RUN_TEST(test_just_outside_deadzone_is_not_neutral);
     RUN_TEST(test_below_center_is_reverse);
     RUN_TEST(test_above_center_is_forward);
     RUN_TEST(test_negative_input_clamped_to_zero);
     RUN_TEST(test_over_range_input_clamped_to_max);
-    RUN_TEST(test_known_value_below_deadzone);
-    RUN_TEST(test_known_value_above_deadzone);
+    RUN_TEST(test_known_value_below_center);
+    RUN_TEST(test_known_value_above_center);
     RUN_TEST(test_output_always_within_esc_range);
     return UNITY_END();
 }

@@ -2,7 +2,8 @@
 #include "drivers/display/ScreenDriver.h"
 #include "ui/ScreenUtils.h"
 #include "drivers/controls/Controls.h"
-#include "config/Esp32Pins.h"
+#include "config/controller/Esp32Pins.h"
+#include "config/ControlConfig.h"
 #include <Arduino.h>
 
 CalibrationFlow calibrationFlow;
@@ -18,7 +19,9 @@ void CalibrationFlow::begin() {
     _cursor = 0;
     _active = -1;
     _wantsExit = false;
-    _yWasUp = _yWasDown = _sw1Was = _sw2Was = false;
+    _yWasUp = _yWasDown = false;
+    _sw1Was = readButton(JOY1_SW_PIN);  // require SW release before it re-registers
+    _sw2Was = readButton(JOY2_SW_PIN);
     showMenu();
 }
 
@@ -31,23 +34,30 @@ VehicleData CalibrationFlow::update(int rawX, int rawY) {
     switch (_state) {
         case State::Menu: return updateMenu(rawX, rawY);
         case State::Running: return updateRunning(rawX, rawY);
-        case State::ResultPause:
-            if (millis() - _resultPauseStart >= RESULT_PAUSE_MS) {
+        case State::ResultPause: {
+            // Hold on the result until SW2 is pressed so the user can note the
+            // values; only a fresh SW2 press returns to the menu.
+            bool sw2 = readButton(JOY2_SW_PIN);
+            if (sw2 && !_sw2Was) {
+                _sw2Was = sw2;
                 _state = State::Menu;
+                _active = -1;
                 showMenu();
-            } else {
-                dispatchUpdate(2048, 2048); // keeps result screen refreshed for scrolling
+                return makeNeutralCommand(static_cast<uint32_t>(millis()));
             }
-            return {2048, 2048};
+            _sw2Was = sw2;
+            dispatchUpdate(ADC_MIDPOINT_RAW, ADC_MIDPOINT_RAW); // keeps result screen refreshed for scrolling
+            return makeNeutralCommand(static_cast<uint32_t>(millis()));
+        }
     }
-    return {2048, 2048};
+    return makeNeutralCommand(static_cast<uint32_t>(millis()));
 }
 
 VehicleData CalibrationFlow::updateMenu(int rawX, int rawY) {
     (void)rawX;
     unsigned long now = millis();
-    bool yUp = rawY > 3500;
-    bool yDown = rawY < 500;
+    bool yUp = rawY > JOY_GESTURE_UP_RAW;
+    bool yDown = rawY < JOY_GESTURE_DOWN_RAW;
     bool sw1 = readButton(JOY1_SW_PIN);
     bool sw2 = readButton(JOY2_SW_PIN);
 
@@ -64,42 +74,45 @@ VehicleData CalibrationFlow::updateMenu(int rawX, int rawY) {
         showMenu();
     }
 
-    // SW2 press (throttle stick): launch selected calibration
-    if (sw2 && !_sw2Was) {
+    // SW1 press (throttle stick): launch selected calibration
+    if (sw1 && !_sw1Was) {
         _active = _cursor;
         _state = State::Running;
         launchActive();
-        _yWasUp = _yWasDown = _sw1Was = _sw2Was = false;
-        return {2048, 2048};
+        _yWasUp = _yWasDown = false;
+        _sw1Was = readButton(JOY1_SW_PIN);  // require SW release before it re-registers
+        _sw2Was = readButton(JOY2_SW_PIN);
+        return makeNeutralCommand(static_cast<uint32_t>(millis()));
     }
 
-    // SW1 press (steering stick): exit calibration back to mode selector
-    if (sw1 && !_sw1Was) {
+    // SW2 press (steering stick): exit calibration back to mode selector
+    if (sw2 && !_sw2Was) {
         _wantsExit = true;
     }
 
     _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1; _sw2Was = sw2;
-    return {2048, 2048};
+    return makeNeutralCommand(static_cast<uint32_t>(millis()));
 }
 
 VehicleData CalibrationFlow::updateRunning(int rawX, int rawY) {
-    bool sw1 = readButton(JOY1_SW_PIN);
+    bool sw2 = readButton(JOY2_SW_PIN);
 
-    // SW1 press (steering stick): cancel running calibration and return to menu
-    if (sw1 && !_sw1Was) {
+    // SW2 press (steering stick): cancel running calibration and return to menu
+    if (sw2 && !_sw2Was) {
         _state = State::Menu;
         _active = -1;
-        _sw1Was = _sw2Was = false;
+        _sw1Was = readButton(JOY1_SW_PIN);  // require SW release before it re-registers
+        _sw2Was = readButton(JOY2_SW_PIN);
         showMenu();
-        return {2048, 2048};
+        return makeNeutralCommand(static_cast<uint32_t>(millis()));
     }
-    _sw1Was = sw1;
+    _sw2Was = sw2;
 
     VehicleData data = dispatchUpdate(rawX, rawY);
 
     if (dispatchIsComplete()) {
         _state = State::ResultPause;
-        _resultPauseStart = millis();
+        _sw2Was = readButton(JOY2_SW_PIN); // require a fresh SW2 press to leave the result
     }
 
     return data;
@@ -119,7 +132,7 @@ VehicleData CalibrationFlow::dispatchUpdate(int rawX, int rawY) {
         case 1: return _servoAlign.update(rawX, rawY);
         case 2: return _throttleDeadzone.update(rawX, rawY);
     }
-    return {2048, 2048};
+    return makeNeutralCommand(static_cast<uint32_t>(millis()));
 }
 
 bool CalibrationFlow::dispatchIsComplete() {

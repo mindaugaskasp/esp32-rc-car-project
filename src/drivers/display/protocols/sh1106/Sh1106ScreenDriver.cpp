@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include "Sh1106ScreenDriver.h"
-#include "config/Esp32Pins.h"
+#include "config/controller/Esp32Pins.h"
 
 // SH1106 128x64 I2C — U8G2_R0 = no rotation; last two args are SCL and SDA pins.
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, SCREEN_SCL_PIN, SCREEN_SDA_PIN);
@@ -66,7 +66,7 @@ void Sh1106ScreenDriver::text(int x, int y, const char* content) {
 // it left (marquee): 1 s pause at start, then 1 px per 50 ms.
 void Sh1106ScreenDriver::scrollText(int y, const char* content) {
     if (!content || !*content) return;
-    int w = (int)u8g2.getStrWidth(content);
+    int w = static_cast<int>(u8g2.getStrWidth(content));
     if (w <= W - 1) {
         u8g2.drawStr(0, y, content);
         return;
@@ -76,13 +76,13 @@ void Sh1106ScreenDriver::scrollText(int y, const char* content) {
     const int GAP_PX = 20; // silent gap between loops
     int scrollSteps = w - (W - 1) + GAP_PX;
     int totalSteps = PAUSE_STEPS + scrollSteps;
-    int phase = (int)((millis() / STEP_MS) % (unsigned long)totalSteps);
+    int phase = static_cast<int>((millis() / STEP_MS) % static_cast<unsigned long>(totalSteps));
     int x = (phase < PAUSE_STEPS) ? 0 : -(phase - PAUSE_STEPS);
     u8g2.drawStr(x, y, content);
 }
 
 int Sh1106ScreenDriver::textW(const char* content) {
-    return content ? (int)u8g2.getStrWidth(content) : 0;
+    return content ? static_cast<int>(u8g2.getStrWidth(content)) : 0;
 }
 
 void Sh1106ScreenDriver::hline(int x, int y, int w) {

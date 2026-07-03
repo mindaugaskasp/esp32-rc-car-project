@@ -7,60 +7,88 @@
 
 DebugScreen debugScreen;
 
-void DebugScreen::showJoystickData(int joystickX, int joystickY) {
+// Title (small font) with a right-aligned "index/total" page tag. Shared by both
+// debug pages so only the middle rows differ between them.
+static void drawDebugHeader(ScreenDriver& driver, const char* title, const char* pageTag) {
+    driver.font(ScreenFont::Small);
+    driver.text(0, 7, title);
+    driver.font(ScreenFont::Tiny);
+    driver.text(ScreenDriver::W - driver.textW(pageTag), 7, pageTag);
+}
+
+// Divider, SW hint, and system-info footer shared by the debug pages. swHint
+// differs per page (page-cycling vs. the trace page's hold-to-toggle gesture).
+static void drawDebugFooter(ScreenDriver& driver, const char* swHint) {
+    driver.hline(0, 48, ScreenDriver::W);
+    driver.font(ScreenFont::Tiny);
+    driver.text(0, 55, swHint);
+    drawSysInfoFooter(driver, 63);
+}
+
+void DebugScreen::showJoystickData(int joystickX, int joystickY, const char* pageTag) {
     ScreenDriver* driver = getScreenDriver();
     if (!driver) return;
 
     char buffer[32];
     driver->clear();
 
-    driver->font(ScreenFont::Small);
-    driver->text(0, 7, "DEBUG JOYSTICK TX");
+    drawDebugHeader(*driver, "DEBUG JOYSTICK TX", pageTag);
 
+    driver->font(ScreenFont::Small);
     snprintf(buffer, sizeof(buffer), "X raw: %d", joystickX);
     driver->text(0, 17, buffer);
 
     snprintf(buffer, sizeof(buffer), "Y raw: %d", joystickY);
-    driver->text(0, 25, buffer);
+    driver->text(0, 26, buffer);
 
     snprintf(buffer, sizeof(buffer), "X delta: %+d", joystickX - JOYSTICK_CENTER_RAW);
-    driver->text(0, 35, buffer);
+    driver->text(0, 36, buffer);
 
-    snprintf(buffer, sizeof(buffer), "Y delta: %+d", joystickY - JOYSTICK_CENTER_RAW);
-    driver->text(0, 43, buffer);
+    snprintf(buffer, sizeof(buffer), "Y delta: %+d", joystickY - THROTTLE_CENTER_RAW);
+    driver->text(0, 44, buffer);
 
-    snprintf(buffer, sizeof(buffer), "Sent: %lu ms", millis());
-    driver->text(0, 51, buffer);
-
-    driver->hline(0, 54, ScreenDriver::W);
-    drawSysInfoFooter(*driver, 62);
-
+    drawDebugFooter(*driver, "SW1:menu  SW2:next page");
     driver->flush();
 }
 
-void DebugScreen::showTelemetry(float batteryVoltage, int speedRpm) {
+void DebugScreen::showTelemetry(float batteryVoltage, int speedRpm, const char* pageTag) {
     ScreenDriver* driver = getScreenDriver();
     if (!driver) return;
 
     char buffer[32];
     driver->clear();
 
-    driver->font(ScreenFont::Small);
-    driver->text(0, 7, "DEBUG TELEMETRY RX");
+    drawDebugHeader(*driver, "DEBUG TELEMETRY RX", pageTag);
 
+    driver->font(ScreenFont::Small);
     snprintf(buffer, sizeof(buffer), "Battery: %.2fV", batteryVoltage);
     driver->text(0, 17, buffer);
 
     snprintf(buffer, sizeof(buffer), "Speed: %d RPM", speedRpm);
-    driver->text(0, 25, buffer);
+    driver->text(0, 26, buffer);
 
     snprintf(buffer, sizeof(buffer), "RX: %lu ms", millis());
-    driver->text(0, 35, buffer);
+    driver->text(0, 36, buffer);
 
-    driver->text(0, 43, "Packet: new hash");
+    drawDebugFooter(*driver, "SW1:menu  SW2:next page");
+    driver->flush();
+}
 
-    driver->hline(0, 47, ScreenDriver::W);
-    drawSysInfoFooter(*driver, 55);
+void DebugScreen::showPacketTrace(bool enabled, const char* pageTag) {
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
 
+    driver->clear();
+
+    drawDebugHeader(*driver, "DEBUG PACKET TRACE", pageTag);
+
+    driver->font(ScreenFont::Small);
+    driver->text(0, 20, "Serial trace:");
+    driver->text(0, 32, enabled ? "  ON" : "  OFF");
+
+    driver->font(ScreenFont::Tiny);
+    driver->text(0, 44, "Heavy UART load - off");
+
+    drawDebugFooter(*driver, "SW1:menu  SW2 hold:toggle");
     driver->flush();
 }

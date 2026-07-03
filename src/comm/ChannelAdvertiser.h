@@ -23,3 +23,10 @@ void stopChannelBroadcast();
 // expectedTransmitterMac, or timeoutMs elapses. Returns the advertised channel, or
 // fallbackChannel on timeout. Packets from other senders are ignored.
 uint8_t receiveChannelAdvertisement(const uint8_t* expectedTransmitterMac, uint32_t timeoutMs, uint8_t fallbackChannel = 6);
+
+// Returns true if (data, len) is a channel advertisement from expectedMac, writing the
+// advertised channel to *outChannel. ISR-safe (no allocation, no Serial) so it can be
+// called directly from an ESP-NOW receive callback — used for runtime channel resync
+// (see VehicleCommandReceiver). A null expectedMac accepts any sender.
+bool tryParseChannelAdvertisement(const uint8_t* mac, const uint8_t* data, int len,
+                                  const uint8_t* expectedMac, uint8_t* outChannel);

@@ -55,7 +55,13 @@ void WifiScanScreen::showResult(const ChannelScanResult& result, int countdownSe
     driver->text(0, 44, buffer);
 
     if (broadcasting) {
-        snprintf(buffer, sizeof(buffer), ">Syncing car ch %d...", result.bestChannel);
+        // Live spinner: showResult() is called every ~200ms across the broadcast
+        // window, so advancing the frame here gives a visibly turning indicator
+        // while the car is being synced (the scan phase above is a single blocking
+        // call and cannot animate).
+        snprintf(buffer, sizeof(buffer), ">Syncing car ch %d [%c]",
+                 result.bestChannel, SPINNER_CHARS[_spinnerFrame % SPINNER_COUNT]);
+        _spinnerFrame++;
     } else {
         snprintf(buffer, sizeof(buffer), "Ch load:  %d APs", result.channelApCount);
     }

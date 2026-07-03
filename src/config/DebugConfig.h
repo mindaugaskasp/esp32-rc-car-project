@@ -4,6 +4,13 @@
 #define DEBUG_JOYSTICK_TO_SERIAL true
 #define CALIBRATION_DEBUG_SCREEN_ENABLED true
 
+// Per-packet trace on the ESP-NOW hot path (receiver command receipt + telemetry
+// echo, transmitter telemetry receipt). MUST stay false during normal operation:
+// these run on every packet, and at the full command rate the 115200 UART can't
+// keep up, so Serial.println() blocks and stalls the loop — adding hundreds of ms
+// of control latency to BOTH the servo and ESC. Enable only for short bench debug.
+#define DEBUG_PACKET_TRACE false
+
 // Minimum time between repeated [JOY] / Telemetry log lines, so the serial
 // monitor stays readable instead of scrolling by every ~20-100ms. Raise this
 // for an even slower feed while eyeballing wiring/calibration values.

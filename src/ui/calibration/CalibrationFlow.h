@@ -17,17 +17,17 @@ public:
     bool wantsExit();
 
 private:
+    // ResultPause holds the finished calibration's result on-screen until the user
+    // presses SW2, so they can read/note the reported values before returning.
     enum class State : uint8_t { Menu, Running, ResultPause };
     State _state = State::Menu;
     int8_t _cursor = 0;
     int8_t _active = -1;
-    unsigned long _resultPauseStart = 0;
 
     static const int8_t ITEM_COUNT = 3;
     static const char* const ITEM_NAMES[ITEM_COUNT];
     static const unsigned long SELECT_MS = 1500;
     static const unsigned long TAP_MAX_MS = 700;
-    static const unsigned long RESULT_PAUSE_MS = 3000;
 
     JoystickCalibrationScreen _joystick;
     ServoCalibrationScreen _servoAlign;
@@ -40,8 +40,8 @@ private:
     unsigned long _yDownStart = 0;
 
     // SW button state (enter / exit)
-    bool _sw1Was = false; // JOY1_SW — cancel / exit
-    bool _sw2Was = false; // JOY2_SW — confirm / enter
+    bool _sw1Was = false; // JOY1_SW — confirm / enter
+    bool _sw2Was = false; // JOY2_SW — cancel / exit
 
     VehicleData updateMenu(int rawX, int rawY);
     VehicleData updateRunning(int rawX, int rawY);

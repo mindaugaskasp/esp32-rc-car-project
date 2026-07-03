@@ -20,14 +20,14 @@ void drawCalibrationStep(ScreenDriver& driver, const char* title, uint8_t step,
     const char* nl = strchr(instruction, '\n');
     if (nl) {
         char line1[32];
-        int len = (int)(nl - instruction);
+        int len = static_cast<int>(nl - instruction);
         if (len > 31) len = 31;
         memcpy(line1, instruction, len);
         line1[len] = '\0';
         driver.scrollText(32, line1);
         driver.scrollText(41, nl + 1);
         if (barValue >= 0) {
-            int barWidth = (int)((long)constrain(barValue, 0, 4095) * 126 / 4095);
+            int barWidth = static_cast<int>(static_cast<long>(constrain(barValue, 0, 4095)) * 126 / 4095);
             driver.frame(0, 55, 128, 8);
             if (barWidth > 0) driver.box(1, 56, barWidth, 6);
         }
@@ -37,7 +37,7 @@ void drawCalibrationStep(ScreenDriver& driver, const char* title, uint8_t step,
             char rawBuffer[16];
             snprintf(rawBuffer, sizeof(rawBuffer), "Raw: %d", barValue);
             driver.scrollText(44, rawBuffer);
-            int barWidth = (int)((long)constrain(barValue, 0, 4095) * 126 / 4095);
+            int barWidth = static_cast<int>(static_cast<long>(constrain(barValue, 0, 4095)) * 126 / 4095);
             driver.frame(0, 55, 128, 8);
             if (barWidth > 0) driver.box(1, 56, barWidth, 6);
         }
@@ -78,7 +78,7 @@ void drawCalibrationMenu(ScreenDriver& driver, const char* above,
 
     driver.hline(0, 50, ScreenDriver::W);
     driver.font(ScreenFont::Tiny);
-    driver.text(0, 58, "Y:nav  SW2:enter  SW1:exit");
+    driver.text(0, 58, "Y:nav  SW1:enter  SW2:exit");
 
     driver.flush();
 }
@@ -87,7 +87,7 @@ void drawSysInfoFooter(ScreenDriver& driver, int y) {
     char buffer[26];
     snprintf(buffer, sizeof(buffer), "RAM:%d%%  FSH:%d%%  %lukB",
              getRamUsedPercent(), getFlashUsedPercent(),
-             (unsigned long)(getFreeHeapBytes() / 1024));
+             static_cast<unsigned long>(getFreeHeapBytes() / 1024));
     driver.font(ScreenFont::Tiny);
     driver.text(0, y, buffer);
 }
