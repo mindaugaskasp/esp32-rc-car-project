@@ -6,6 +6,19 @@
 
 Screen screen;
 
+// Nested-arcs Wi-Fi glyph, 7px wide x 6px tall, built from rectangle primitives
+// (the display driver exposes no per-pixel call, so 1x1 boxes stand in for pixels).
+// yTop is the top row; the icon sits inside the battery row's baseline band.
+static void drawWifiIcon(ScreenDriver* driver, int x, int yTop) {
+    driver->hline(x + 1, yTop, 5);          // outer arc top
+    driver->box(x, yTop + 1, 1, 1);         // outer arc left
+    driver->box(x + 6, yTop + 1, 1, 1);     // outer arc right
+    driver->hline(x + 2, yTop + 2, 3);      // inner arc top
+    driver->box(x + 1, yTop + 3, 1, 1);     // inner arc left
+    driver->box(x + 5, yTop + 3, 1, 1);     // inner arc right
+    driver->box(x + 3, yTop + 5, 1, 1);     // signal dot
+}
+
 void Screen::begin() {
     ScreenDriver* driver = getScreenDriver();
     if (!driver) return;
@@ -60,30 +73,42 @@ void Screen::showDashboard(const DashboardData& dashboard) {
     driver->text(ScreenDriver::W - driver->textW(buffer), 10, buffer);
 
     driver->font(ScreenFont::Tiny);
-#if DEBUG_DASHBOARD_LINK_STATS
-    // Rotate the single indicator slot between latency / loss / jitter so all
-    // three fit without crowding the battery row.
-    int statSlot = static_cast<int>((millis() / DASHBOARD_STAT_DWELL_MS) % 3);
+    bool showWifiIcon = true;
+    // In debug mode the single indicator slot rotates between latency / loss /
+    // jitter so all three fit without crowding the battery row; otherwise it just
+    // shows latency. The Wi-Fi icon only fronts the latency reading — loss/jitter
+    // are their own labelled stats.
+    int statSlot = dashboard.debugMode
+        ? static_cast<int>((millis() / DASHBOARD_STAT_DWELL_MS) % 3)
+        : 0;
     if (statSlot == 1 && dashboard.lossPercent >= 0) {
         snprintf(buffer, sizeof(buffer), "L:%d%%", dashboard.lossPercent);
+        showWifiIcon = false;
     } else if (statSlot == 2 && dashboard.jitterMs >= 0) {
         snprintf(buffer, sizeof(buffer), "J:%dms", dashboard.jitterMs);
+        showWifiIcon = false;
     } else if (dashboard.latencyMs >= 0) {
         snprintf(buffer, sizeof(buffer), "%dms", dashboard.latencyMs);
     } else {
         snprintf(buffer, sizeof(buffer), "--");
     }
-#else
-    if (dashboard.latencyMs < 0) snprintf(buffer, sizeof(buffer), "--");
-    else snprintf(buffer, sizeof(buffer), "%dms", dashboard.latencyMs);
-#endif
-    driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 10, buffer);
+    if (showWifiIcon) {
+        const int iconWidth = 7;
+        const int iconGap = 2;
+        const int iconTop = 4;
+        int groupWidth = iconWidth + iconGap + driver->textW(buffer);
+        int groupStart = (ScreenDriver::W - groupWidth) / 2;
+        drawWifiIcon(driver, groupStart, iconTop);
+        driver->text(groupStart + iconWidth + iconGap, 10, buffer);
+    } else {
+        driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 10, buffer);
+    }
 
     driver->hline(0, 14, ScreenDriver::W);
 
     // ── Menu hint (tiny, right-aligned in the gap above speed) ───────────────
     driver->font(ScreenFont::Tiny);
-    driver->text(ScreenDriver::W - driver->textW("SW1:menu"), 20, "SW1:menu");
+    driver->text(ScreenDriver::W - driver->textW("STR:menu"), 20, "STR:menu");
 
     // ── Speed ────────────────────────────────────────────────────────────────
     driver->font(ScreenFont::Large);
@@ -99,6 +124,12 @@ void Screen::showDashboard(const DashboardData& dashboard) {
     driver->font(ScreenFont::Medium);
     snprintf(buffer, sizeof(buffer), "%d RPM", dashboard.speedRpm);
     driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 57, buffer);
+
+    // ── Debug badge — bottom-left, in the 6px band below the RPM row ────────────
+    if (dashboard.debugMode) {
+        driver->font(ScreenFont::Tiny);
+        driver->text(0, ScreenDriver::H - 1, "DEBUG MODE");
+    }
 
     driver->flush();
 }

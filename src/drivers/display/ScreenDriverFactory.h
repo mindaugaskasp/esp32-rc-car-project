@@ -1,6 +1,6 @@
 #pragma once
 
 #include "ScreenDriver.h"
-#include <memory>
 
-std::unique_ptr<ScreenDriver> createScreenDriver();
+// Returns the single display driver instance (function-local static — no heap).
+ScreenDriver* createScreenDriver();

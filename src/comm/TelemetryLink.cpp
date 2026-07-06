@@ -34,7 +34,7 @@ void TelemetryLink::handleReceive(const uint8_t* mac, const uint8_t* incomingDat
     portENTER_CRITICAL(&_mux);
     _pending = t;
     _pendingAvailable = true;
-    _rxCount++;
+    _receivedCount++;
     if (rtt >= 0) {
         _latestLatencyMs = rtt;
         _rttSampleCount++;

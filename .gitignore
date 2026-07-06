@@ -38,3 +38,6 @@
 src/esp32-rc-car-project.code-workspace
 .ports
 .claude
+
+# macOS
+.DS_Store

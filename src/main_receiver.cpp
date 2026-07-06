@@ -10,13 +10,6 @@
 #include "comm/ChannelAdvertiser.h"
 #include "comm/VehicleCommandReceiver.h"
 
-// Worst-case transmitter startup is a multi-second channel scan followed by an
-// 8s broadcast window (see CHANNEL_BROADCAST_MS in main_transmitter.cpp). This
-// timeout must comfortably exceed that so the two boots have real overlap even
-// if they aren't powered on at exactly the same moment.
-static const unsigned long CHANNEL_SYNC_TIMEOUT_MS = 20000;
-static const uint8_t CHANNEL_SYNC_FALLBACK = 6;
-
 void setup() {
     Serial.begin(BAUD_RATE);
     delay(500); // Wait for serial monitor to connect
@@ -30,16 +23,23 @@ void setup() {
 
     initEspNow();
 
-    // Wait for a channel advertisement from our transmitter, fall back to CHANNEL_SYNC_FALLBACK
-    uint8_t channel = receiveChannelAdvertisement(TRANSMITTER_MAC, CHANNEL_SYNC_TIMEOUT_MS, CHANNEL_SYNC_FALLBACK);
+    // Camp on the rendezvous channel until the transmitter announces its channel.
+    // Blocks here (vehicle stays neutral) rather than inventing a fallback channel.
+    uint8_t channel = waitForChannelAdvertisement(TRANSMITTER_MAC);
     applyWifiChannel(channel);
 
     addPeer(TRANSMITTER_MAC);
     vehicleCommandReceiver.begin();
+    // The "link established" servo twitch now fires on the first real command in
+    // VehicleCommandReceiver, not here — channel sync alone isn't a confirmed link.
     debugLogger.log("Receiver ready and waiting for ESP-NOW packets");
 }
 
 void loop() {
     updateHallSensor();
     vehicleCommandReceiver.update();
+
+    // Bench aid, off by default; enable DEBUG_HALL_TO_SERIAL to verify the sensor
+    // by spinning the wheel by hand. Self-gated and rate-limited inside the logger.
+    debugLogger.logHallRpm(getMotorRpm());
 }

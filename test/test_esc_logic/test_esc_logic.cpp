@@ -14,42 +14,21 @@ void test_full_throttle_returns_max() {
     TEST_ASSERT_EQUAL(ESC_MAX_MICROS, computeEscMicros(THROTTLE_JOY_MAX));
 }
 
-// --- Deadzone (symmetric around the measured throttle center) ---
+// --- Center reads neutral (deadzone is now removed transmitter-side) ---
 
 void test_center_is_neutral() {
     TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW));
 }
 
-// Regression: the joystick rests near THROTTLE_CENTER_RAW, not the nominal 2048.
-// Every value in the observed resting-jitter window must map to neutral so the
-// motor stays stopped at rest (previously ~2225 fell outside the old band and the
-// motor idled forward).
-void test_resting_jitter_stays_neutral() {
-    for (int rawY = 2222; rawY <= 2231; rawY++) {
-        TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(rawY));
-    }
-}
-
-void test_deadzone_edges_are_neutral() {
-    // diff == JOY_DEADZONE_Y is NOT outside the deadzone (condition is diff > deadzone)
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + JOY_DEADZONE_Y));
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - JOY_DEADZONE_Y));
-}
-
-void test_just_outside_deadzone_is_not_neutral() {
-    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + JOY_DEADZONE_Y + 1));
-    TEST_ASSERT_NOT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - JOY_DEADZONE_Y - 1));
-}
-
 // --- Bidirectional mapping: below-center is reverse, above-center is forward ---
 
 void test_below_center_is_reverse() {
-    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - JOY_DEADZONE_Y - 1));
+    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - 1));
     TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(500));
 }
 
 void test_above_center_is_forward() {
-    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + JOY_DEADZONE_Y + 1));
+    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + 50));
     TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(3500));
 }
 
@@ -103,9 +82,6 @@ int main(int argc, char **argv) {
     RUN_TEST(test_full_brake_returns_min);
     RUN_TEST(test_full_throttle_returns_max);
     RUN_TEST(test_center_is_neutral);
-    RUN_TEST(test_resting_jitter_stays_neutral);
-    RUN_TEST(test_deadzone_edges_are_neutral);
-    RUN_TEST(test_just_outside_deadzone_is_not_neutral);
     RUN_TEST(test_below_center_is_reverse);
     RUN_TEST(test_above_center_is_forward);
     RUN_TEST(test_negative_input_clamped_to_zero);

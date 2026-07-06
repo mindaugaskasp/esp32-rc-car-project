@@ -16,3 +16,10 @@
 // Suppresses jitter from ADC noise (~5-20 ADC units → ~2-10 µs at mid-throw).
 // Raise if jitter persists; lower if small steering corrections feel sluggish.
 #define SERVO_DEADBAND_MICROS 8
+
+// One-shot "link established" wiggle: a few small sweeps either side of center so
+// the car physically signals it has synced with the transmitter. Runs once at
+// connection time only, never in the control loop.
+#define SERVO_TWITCH_OFFSET_MICROS 120
+#define SERVO_TWITCH_COUNT 4
+#define SERVO_TWITCH_HOLD_MS 120

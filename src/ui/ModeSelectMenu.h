@@ -29,8 +29,8 @@ public:
     // mode is detected (stateful edge-detect, shared across all modes).
     bool checkOpenRequest();
 
-    enum class Result : uint8_t { None, Selected, Cancelled };
-    // joystickY drives the up/down tap gesture; SW2=cancel, SW1=confirm.
+    enum class Result : uint8_t { None, Selected, Exit };
+    // joystickY drives the up/down tap gesture; throttle=exit (to Dashboard), steering=select.
     Result update(int joystickY);
 
     int8_t getCursor() const { return _cursor; }
@@ -45,12 +45,12 @@ private:
 
     bool _yWasUp = false, _yWasDown = false;
     unsigned long _yUpStart = 0, _yDownStart = 0;
-    bool _sw1Was = false, _sw2Was = false;
+    bool _throttleSwWas = false, _steeringSwWas = false;
 
     // Separate edge-detect state for checkOpenRequest() — tracks button edges
-    // in a completely different context (before the menu is open) from _sw1Was
-    // /_sw2Was above (confirm/cancel while the menu is already open).
-    bool _openJoy1SwWas = false, _openJoy2SwWas = false;
+    // in a completely different context (before the menu is open) from _throttleSwWas
+    // /_steeringSwWas above (confirm/cancel while the menu is already open).
+    bool _openThrottleSwWas = false, _openSteeringSwWas = false;
 };
 
 extern ModeSelectMenu modeSelectMenu;

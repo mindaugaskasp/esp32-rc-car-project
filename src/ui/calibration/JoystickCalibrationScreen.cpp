@@ -18,15 +18,15 @@ void JoystickCalibrationScreen::begin() {
     _maxX = _maxY = 0;
     _restMinX = _restMinY = ADC_MAX_RAW;
     _restMaxX = _restMaxY = 0;
-    _sw1Was = readButton(JOY1_SW_PIN); // require SW1 release before it advances a step
+    _steeringSwWas = readButton(STEERING_SW_PIN); // require steering release before it advances a step
     showRelease(2);
 }
 
 VehicleData JoystickCalibrationScreen::update(int rawX, int rawY) {
     unsigned long now = millis();
     unsigned long elapsed = now - _stateEnteredAt;
-    bool sw1 = readButton(JOY1_SW_PIN);
-    bool sw1Pressed = sw1 && !_sw1Was; // rising edge = advance the current sweep step
+    bool steeringSw = readButton(STEERING_SW_PIN);
+    bool steeringSwPressed = steeringSw && !_steeringSwWas; // rising edge = advance the current sweep step
 
     switch (_state) {
         case State::Release: {
@@ -60,19 +60,19 @@ VehicleData JoystickCalibrationScreen::update(int rawX, int rawY) {
             if (rawX < _minX) _minX = rawX;
             if (rawX > _maxX) _maxX = rawX;
             showSweepX(rawX);
-            if (sw1Pressed) { _state = State::SweepY; _stateEnteredAt = now; }
+            if (steeringSwPressed) { _state = State::SweepY; _stateEnteredAt = now; }
             break;
         case State::SweepY:
             if (rawY < _minY) _minY = rawY;
             if (rawY > _maxY) _maxY = rawY;
             showSweepY(rawY);
-            if (sw1Pressed) { _state = State::Complete; printResults(); showResult(); }
+            if (steeringSwPressed) { _state = State::Complete; printResults(); showResult(); }
             break;
         case State::Complete:
             showResult();
             break;
     }
-    _sw1Was = sw1;
+    _steeringSwWas = steeringSw;
     return makeNeutralCommand(static_cast<uint32_t>(now));
 }
 
@@ -95,7 +95,7 @@ void JoystickCalibrationScreen::showSweepX(int rawX) {
     ScreenDriver* driver = getScreenDriver();
     if (!driver) return;
     char instruction[44];
-    snprintf(instruction, sizeof(instruction), "Sweep X left<->right\nlo%d hi%d  SW1:next", _minX, _maxX);
+    snprintf(instruction, sizeof(instruction), "Sweep X left<->right\nlo%d hi%d  STR:next", _minX, _maxX);
     drawCalibrationStep(*driver,"JOY CAL - X AXIS", 2, 3, instruction, rawX);
 }
 
@@ -103,11 +103,11 @@ void JoystickCalibrationScreen::showSweepY(int rawY) {
     ScreenDriver* driver = getScreenDriver();
     if (!driver) return;
     char instruction[44];
-    snprintf(instruction, sizeof(instruction), "Sweep Y up<->down\nlo%d hi%d  SW1:done", _minY, _maxY);
+    snprintf(instruction, sizeof(instruction), "Sweep Y up<->down\nlo%d hi%d  STR:done", _minY, _maxY);
     drawCalibrationStep(*driver,"JOY CAL - Y AXIS", 3, 3, instruction, rawY);
 }
 
-// Result holds until SW2 (CalibrationFlow) so the user can copy these into
+// Result holds until throttle (CalibrationFlow) so the user can copy these into
 // ControlConfig.h. Shows both centers, per-axis travel, and the inferred per-axis
 // deadzones; the exact #define lines are also printed to serial by printResults().
 void JoystickCalibrationScreen::showResult() {
@@ -130,7 +130,7 @@ void JoystickCalibrationScreen::showResult() {
     driver->scrollText(40, buffer);
 
     driver->font(ScreenFont::Tiny);
-    driver->text(0, 62, "SW2:done  cfg in serial log");
+    driver->text(0, 62, "THR:back  cfg in serial log");
     driver->flush();
 }
 
@@ -142,7 +142,7 @@ void JoystickCalibrationScreen::printResults() {
     debugLogger.logf("[JOY CAL] Y center=%d rest[%d..%d] travel[%d..%d]",
                      _centerY, _restMinY, _restMaxY, _minY, _maxY);
     debugLogger.log("[JOY CAL] Suggested ControlConfig.h values:");
-    debugLogger.logf("[JOY CAL]   #define JOYSTICK_CENTER_RAW %d", _centerX);
+    debugLogger.logf("[JOY CAL]   #define STEERING_CENTER_RAW %d", _centerX);
     debugLogger.logf("[JOY CAL]   #define THROTTLE_CENTER_RAW %d", _centerY);
     debugLogger.logf("[JOY CAL]   #define JOY_DEADZONE_X %d", deadzoneX);
     debugLogger.logf("[JOY CAL]   #define JOY_DEADZONE_Y %d", deadzoneY);

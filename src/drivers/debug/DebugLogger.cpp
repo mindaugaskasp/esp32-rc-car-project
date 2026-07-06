@@ -40,10 +40,25 @@ void DebugLogger::logJoystick(int joystickX, int joystickY) {
 }
 
 void DebugLogger::logEsc(int speed) {
-    if (!CALIBRATION_DEBUG_SCREEN_ENABLED) {
+    if (!DEBUG_ESC_TO_SERIAL) {
         return;
     }
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "[ESC]: %d", speed);
+    logSerial(buffer);
+}
+
+void DebugLogger::logHallRpm(int rpm) {
+    if (!DEBUG_HALL_TO_SERIAL) {
+        return;
+    }
+    static unsigned long lastLogTime = 0;
+    unsigned long now = millis();
+    if (now - lastLogTime < DEBUG_LOG_MIN_INTERVAL_MS) {
+        return;
+    }
+    lastLogTime = now;
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "[HALL]: rpm=%d", rpm);
     logSerial(buffer);
 }

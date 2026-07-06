@@ -62,6 +62,15 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
 }
 
 void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& data) {
+    // First real command from the paired transmitter = a confirmed bidirectional
+    // link (we received a command and are about to echo telemetry back), mirroring
+    // when the remote's screen shows "connected". Blocking twitch is fine as a
+    // one-time connection event; it runs before the car is armed to drive.
+    if (!_linkTwitchDone) {
+        _linkTwitchDone = true;
+        twitchServo();
+    }
+
     setServoAngle(data.servoPosition);
 
     // Failsafe arming: the ESC is held at neutral until a short run of valid

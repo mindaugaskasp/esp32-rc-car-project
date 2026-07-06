@@ -11,6 +11,7 @@ struct DashboardData {
     int latencyMs; // -1 = not yet measured
     int lossPercent; // -1 = not yet available
     int jitterMs; // -1 = not yet available
+    bool debugMode; // true while the physical DEBUG switch is on — dashboard shows a DEBUG MODE badge
 };
 
 class Screen {

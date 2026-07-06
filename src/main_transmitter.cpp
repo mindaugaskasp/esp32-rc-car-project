@@ -1,10 +1,12 @@
 #include <Arduino.h>
+#include <stdio.h>
 #include "config/controller/Esp32Pins.h"
 #include "config/ControlConfig.h"
 #include "config/DebugConfig.h"
 #include "drivers/debug/DebugLogger.h"
 #include "config/WifiConfig.h"
 #include "drivers/controls/Controls.h"
+#include "drivers/controls/DebugModeSwitch.h"
 #include "ui/Screen.h"
 #include "ui/WifiPingScreen.h"
 #include "ui/ModeSelectMenu.h"
@@ -18,33 +20,61 @@
 #include "app/DashboardMode.h"
 #include "app/DebugMode.h"
 #include "app/WifiPingMode.h"
+#include "app/SafetyMode.h"
+#include "app/SessionMode.h"
+#include "app/SessionTracker.h"
 
 // ── Top-level mode state machine ────────────────────────────────────────────
 // Each mode's actual per-tick behavior lives in its own class (DashboardMode,
 // DebugMode, WifiPingMode, CalibrationFlow, ModeSelectMenu); this file only owns
 // which mode is active and how modes hand off to one another.
-enum class TransmitterOperatingMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing };
+enum class TransmitterOperatingMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing, Safety, Session, Reboot };
+
+// Seconds shown on the "Rebooting in N..." countdown before ESP.restart().
+static const int REBOOT_COUNTDOWN_SECONDS = 3;
 
 // Single source of truth for the mode menu: display label ↔ mode. The menu rows,
 // the menu cursor, and the selection dispatch all derive from this table, so
 // adding or reordering a selectable mode is a one-line change here.
-struct MenuEntry { const char* name; TransmitterOperatingMode mode; };
+struct MenuEntry { const char* name; TransmitterOperatingMode mode; bool debugOnly; };
 static constexpr MenuEntry MENU[] = {
-    {"Dashboard", TransmitterOperatingMode::Dashboard},
-    {"Debug Info", TransmitterOperatingMode::Debug},
-    {"Calibration", TransmitterOperatingMode::Calibration},
-    {"WiFi Ping", TransmitterOperatingMode::WifiPing},
+    {"Dashboard", TransmitterOperatingMode::Dashboard, false},
+    {"Session Data", TransmitterOperatingMode::Session, false},
+    {"Safety Stop", TransmitterOperatingMode::Safety, false},
+    {"Debug Info", TransmitterOperatingMode::Debug, true},
+    {"Calibration", TransmitterOperatingMode::Calibration, false},
+    {"WiFi Ping", TransmitterOperatingMode::WifiPing, false},
+    {"Reboot", TransmitterOperatingMode::Reboot, false},
 };
 static constexpr int8_t MENU_COUNT = sizeof(MENU) / sizeof(MENU[0]);
 
+// The menu is rebuilt each time it opens so debug-only rows (Debug Info) appear
+// only while the physical DEBUG switch is on. These hold the currently visible
+// subset; ModeSelectMenu retains a pointer to visibleNames, so it must outlive
+// the menu — file-scope static satisfies that.
+static const char* visibleNames[MENU_COUNT];
+static TransmitterOperatingMode visibleModes[MENU_COUNT];
+static int8_t visibleCount = 0;
+
 static TransmitterOperatingMode currentMode = TransmitterOperatingMode::Dashboard;
-static TransmitterOperatingMode prevMode = TransmitterOperatingMode::Dashboard;  // restored on ModeSelect cancel
 
 static int8_t cursorForMode(TransmitterOperatingMode mode) {
-    for (int8_t index = 0; index < MENU_COUNT; index++) {
-        if (MENU[index].mode == mode) return index;
+    for (int8_t index = 0; index < visibleCount; index++) {
+        if (visibleModes[index] == mode) return index;
     }
     return 0;
+}
+
+static void rebuildVisibleMenu() {
+    bool debugActive = isDebugModeActive();
+    visibleCount = 0;
+    for (int8_t index = 0; index < MENU_COUNT; index++) {
+        if (MENU[index].debugOnly && !debugActive) continue;
+        visibleNames[visibleCount] = MENU[index].name;
+        visibleModes[visibleCount] = MENU[index].mode;
+        visibleCount++;
+    }
+    modeSelectMenu.setEntries(visibleNames, visibleCount);
 }
 
 // Enter a mode from the menu, running its one-time entry hook.
@@ -55,13 +85,28 @@ static void beginMode(TransmitterOperatingMode mode) {
         case TransmitterOperatingMode::Debug: debugMode.begin(); break;
         case TransmitterOperatingMode::Calibration: calibrationFlow.begin(); break;
         case TransmitterOperatingMode::WifiPing: wifiPingMode.begin(); break;
+        case TransmitterOperatingMode::Safety: safetyMode.begin(); break;
+        case TransmitterOperatingMode::Session: sessionMode.begin(); break;
+        case TransmitterOperatingMode::Reboot:
+            // Restart the ESP32 in place. The receiver's resync loop re-listens for
+            // our channel advertisement on link loss, so the car reconnects without a
+            // power cycle. delay() is fine here — this is a terminal action counting
+            // down to ESP.restart(), which never returns.
+            for (int secondsRemaining = REBOOT_COUNTDOWN_SECONDS; secondsRemaining >= 1; secondsRemaining--) {
+                char message[24];
+                snprintf(message, sizeof(message), "Rebooting in %d...", secondsRemaining);
+                screen.showStartup(message);
+                delay(1000);
+            }
+            ESP.restart();
+            break;
         default: break;  // ModeSelect is entered via enterModeSelect(), not here
     }
 }
 
 static void enterModeSelect(TransmitterOperatingMode from) {
-    prevMode = from;
     currentMode = TransmitterOperatingMode::ModeSelect;
+    rebuildVisibleMenu();  // re-read the DEBUG switch so the Debug row shows only while it is on
     modeSelectMenu.setCursor(cursorForMode(from));
     modeSelectMenu.onOpen();  // require SW release before select/back registers
     modeSelectMenu.show();
@@ -71,12 +116,9 @@ void setup() {
     Serial.begin(BAUD_RATE);
     delay(500);
 
-    initButton(JOY1_SW_PIN);
-    initButton(JOY2_SW_PIN);
-
-    static const char* menuNames[MENU_COUNT];
-    for (int8_t index = 0; index < MENU_COUNT; index++) menuNames[index] = MENU[index].name;
-    modeSelectMenu.setEntries(menuNames, MENU_COUNT);
+    initButton(THROTTLE_SW_PIN);
+    initButton(STEERING_SW_PIN);
+    initDebugModeSwitch();
 
     screen.begin();  // shows "Initializing..."
 
@@ -101,6 +143,7 @@ void setup() {
     sendData(probe, RECEIVER_MAC);
 
     telemetryLink.begin();
+    sessionTracker.begin();
     debugLogger.log("RC Remote ready");
     screen.showStartup("Waiting for car...");
     dashboardMode.markSetupComplete();
@@ -120,11 +163,11 @@ static const unsigned long HEARTBEAT_INTERVAL_MS = 300;
 static const unsigned long LOOP_INTERVAL_MS = 20;
 
 static int readJoystickX() {
-    return applyAxisInvert(readInput(JOY2_X_PIN), JOY_INVERT_X, ADC_MAX_RAW);
+    return applyAxisInvert(readInput(STEERING_X_PIN), JOY_INVERT_X, ADC_MAX_RAW);
 }
 
 static int readJoystickY() {
-    return applyAxisInvert(readInput(JOY1_Y_PIN), JOY_INVERT_Y, ADC_MAX_RAW);
+    return applyAxisInvert(readInput(THROTTLE_Y_PIN), JOY_INVERT_Y, ADC_MAX_RAW);
 }
 
 void loop() {
@@ -155,11 +198,11 @@ void loop() {
             ModeSelectMenu::Result result = modeSelectMenu.update(joystickY);
             if (result == ModeSelectMenu::Result::Selected) {
                 modeSelectMenu.onClose();  // require SW release before re-open registers
-                beginMode(MENU[modeSelectMenu.getCursor()].mode);
-            } else if (result == ModeSelectMenu::Result::Cancelled) {
+                beginMode(visibleModes[modeSelectMenu.getCursor()]);
+            } else if (result == ModeSelectMenu::Result::Exit) {
                 modeSelectMenu.onClose();
-                currentMode = prevMode;
-                if (currentMode == TransmitterOperatingMode::Dashboard) dashboardMode.show();
+                currentMode = TransmitterOperatingMode::Dashboard;  // throttle exits the menu home to the dashboard
+                dashboardMode.show();
             }
             break;
         }
@@ -179,6 +222,23 @@ void loop() {
                 enterModeSelect(TransmitterOperatingMode::WifiPing);
             }
             break;
+
+        case TransmitterOperatingMode::Safety:
+            safetyMode.update();
+            if (safetyMode.wantsExit()) {
+                enterModeSelect(TransmitterOperatingMode::Safety);
+            }
+            break;
+
+        case TransmitterOperatingMode::Session:
+            sessionMode.update();
+            if (sessionMode.wantsExit()) {
+                enterModeSelect(TransmitterOperatingMode::Session);
+            }
+            break;
+
+        case TransmitterOperatingMode::Reboot:
+            break;  // never a resident mode — beginMode() restarts the ESP32 on selection
     }
 
     // Heartbeat — see HEARTBEAT_INTERVAL_MS. Neutral is the correct thing to send

@@ -17,14 +17,15 @@ altitude of abstraction; board membership (transmitter vs. receiver) is expresse
 
 ```
 src/
-├── main_transmitter.cpp          # Transmitter entry point — TxMode state machine + setup()/loop() only
+├── main_transmitter.cpp          # Transmitter entry point — TransmitterOperatingMode state machine + setup()/loop() only
 ├── main_receiver.cpp             # Receiver entry point — setup()/loop() only
 ├── config/
-│   ├── ControlConfig.h           # Umbrella — includes the four tuning files below
-│   ├── JoystickConfig.h          # Stick centers, deadzones, inversion, travel endpoints (X & Y)
+│   ├── ControlConfig.h           # Umbrella — includes the five tuning files below
+│   ├── JoystickConfig.h          # Stick centers, deadzones, inversion, travel endpoints, expo/rate (X & Y)
 │   ├── ServoConfig.h             # Steering-servo PWM range, smoothing, jitter deadband
 │   ├── EscConfig.h               # ESC output deadband, throttle-invert
 │   ├── HallConfig.h              # Hall speed-sensor pulses/rev, RPM window, debounce
+│   ├── VehicleConfig.h           # Drivetrain geometry (wheel diameter, gear ratio) for km/h
 │   ├── DebugConfig.h             # Per-subsystem debug flags and macros
 │   ├── WifiConfig.h              # MAC addresses, ESP-NOW config
 │   └── controller/               # Board pin maps (hardware wiring, kept apart from tuning)
@@ -33,7 +34,7 @@ src/
 │       └── Esp32PinsReceiver.h   # Receiver GPIO pin assignments
 │
 ├── drivers/                      # L0 — ONLY code that touches a peripheral directly
-│   ├── controls/                 # Joystick ADC sampling + buttons
+│   ├── controls/                 # Joystick ADC sampling + buttons + DebugModeSwitch + InputConditioningLogic.h (tx deadzone/expo/rate, testable)
 │   ├── debug/                    # Serial logging (DebugLogger) + Esp32SysInfo + PacketTrace (tx runtime trace gate)
 │   ├── radio/
 │   │   └── EspNowDriver.h/cpp    # ESP-NOW init, peer management, raw send/receive
@@ -48,6 +49,9 @@ src/
 │   │   ├── ServoDriver.h/cpp     # Servo PWM output with smoothing
 │   │   └── ServoLogic.h          # Pure angle computation — no Arduino dep, testable
 │   └── hall/                     # Hall-effect speed sensor (receiver)
+│       ├── HallSensorDriver.h/cpp # Pulse-counting speed sensor (receiver)
+│       ├── HallLogic.h           # Pure RPM computation — no Arduino dep, testable
+│       └── SpeedLogic.h          # Pure motor-RPM → km/h — no Arduino dep, testable (tx dashboard includes it)
 │
 ├── comm/                         # L1 — messaging built on the radio driver
 │   ├── DataTypes.h               # VehicleData / TelemetryData wire structs (shared contract)
@@ -65,16 +69,27 @@ src/
 │   ├── DebugScreen.h/cpp         # Debug Info mode display
 │   ├── WifiPingScreen.h/cpp      # WiFi Ping mode's stat display
 │   ├── WifiScanScreen.h/cpp      # Startup channel-scan progress/result display
-│   └── calibration/              # On-screen calibration UI and CalibrationFlow
+│   ├── SafetyScreen.h/cpp        # Safety-stop confirmation display
+│   ├── SessionScreen.h/cpp       # Session Data stats + speed-over-time graph
+│   └── calibration/              # On-screen calibration UI and CalibrationFlow (incl. ResponseTuningScreen feel tuner)
 │
 └── app/                          # L2 — top-level feature modes (transmitter)
     ├── DashboardMode.h/cpp       # Dashboard mode: connection state, link-quality indicator
     ├── DebugMode.h/cpp           # Debug Info mode
-    └── WifiPingMode.h/cpp        # WiFi Ping mode: fixed-rate ping + RTT/loss/jitter stats
+    ├── WifiPingMode.h/cpp        # WiFi Ping mode: fixed-rate ping + RTT/loss/jitter stats
+    ├── SafetyMode.h/cpp          # Safety-stop mode: continuous safe-neutral e-stop
+    ├── SessionMode.h/cpp         # Session Data mode: stats/graph pages
+    ├── SessionTracker.h/cpp      # Accumulates session distance/time/speed from telemetry
+    └── SessionStatsLogic.h       # Pure session-stats accumulation — no Arduino dep, testable
 
 test/
 ├── test_esc_logic/               # Unity tests — ESC speed mapping
-└── test_servo_logic/             # Unity tests — servo angle mapping
+├── test_servo_logic/             # Unity tests — servo angle mapping
+├── test_hall_logic/              # Unity tests — hall RPM computation
+├── test_speed_logic/             # Unity tests — motor-RPM → km/h
+├── test_input_conditioning_logic/ # Unity tests — deadzone/expo/rate conditioning
+├── test_joystick_calibration_logic/ # Unity tests — calibration center/deadzone suggestion
+└── test_session_stats_logic/     # Unity tests — session-stats accumulation
 ```
 
 Both `main_*.cpp` files are intentionally thin: they own only the top-level mode state machine (transmitter) or the `setup()`/`loop()` wiring (receiver). Per-mode behavior lives in `app/`, ESP-NOW receipt/send-decision logic lives in `comm/`, and views live in `ui/`. When a main file starts accumulating non-trivial logic again, extract it into a new class in the layer that matches its altitude (`comm/`, `ui/`, or `app/`) rather than letting it grow. Keep `drivers/` for peripheral-touching code only — if a new class merely *uses* a driver, it belongs in `comm/`, `ui/`, or `app/`, not `drivers/`.
@@ -527,6 +542,7 @@ directory with cross-board files, as in `comm/`.
 | `drivers/hall/` | transmitter |
 | `comm/VehicleCommandReceiver.cpp` | transmitter |
 | `drivers/display/` | receiver |
+| `drivers/controls/DebugModeSwitch.cpp` | receiver |
 | `drivers/debug/PacketTrace.cpp` | receiver |
 | `comm/ChannelSync.cpp` | receiver |
 | `comm/TelemetryLink.cpp` | receiver |

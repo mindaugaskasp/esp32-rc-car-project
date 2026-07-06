@@ -24,7 +24,7 @@ void ServoCalibrationScreen::begin() {
     _trimOffsetRaw = 0;
     _leftRaw = 0;
     _rightRaw = 0;
-    _yWasUp = _yWasDown = _sw1Was = false;
+    _yWasUp = _yWasDown = _steeringSwWas = false;
     showAlignCenter();
 }
 
@@ -37,7 +37,7 @@ VehicleData ServoCalibrationScreen::update(int rawX, int rawY) {
 
     bool yUp = rawY > JOY_GESTURE_UP_RAW;
     bool yDown = rawY < JOY_GESTURE_DOWN_RAW;
-    bool sw1 = readButton(JOY1_SW_PIN); // SW1 (throttle stick) = confirm
+    bool steeringSw = readButton(STEERING_SW_PIN); // steering-stick button = confirm/advance
 
     if (yUp && !_yWasUp) _yUpStart = now;
     if (yDown && !_yWasDown) _yDownStart = now;
@@ -59,15 +59,15 @@ VehicleData ServoCalibrationScreen::update(int rawX, int rawY) {
                 _trimOffsetRaw = constrain(_trimOffsetRaw + STEP_RAW, -MAX_OFFSET, MAX_OFFSET);
             if (!yDown && _yWasDown && (now - _yDownStart < TAP_MAX_MS))
                 _trimOffsetRaw = constrain(_trimOffsetRaw - STEP_RAW, -MAX_OFFSET, MAX_OFFSET);
-            // SW1 press: trim done, move on to left limit
-            if (sw1 && !_sw1Was) {
+            // steering press: trim done, move on to left limit
+            if (steeringSw && !_steeringSwWas) {
                 _state = State::TestLeft;
-                _yWasUp = _yWasDown = _sw1Was = false;
+                _yWasUp = _yWasDown = _steeringSwWas = false;
                 _yUpStart = now; // reset hold timer for next phase
                 return {ADC_MIDPOINT_RAW + _trimOffsetRaw, THROTTLE_CENTER_RAW, static_cast<uint32_t>(now)};
             }
             showTrimCenter();
-            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
+            _yWasUp = yUp; _yWasDown = yDown; _steeringSwWas = steeringSw;
             return {ADC_MIDPOINT_RAW + _trimOffsetRaw, THROTTLE_CENTER_RAW, static_cast<uint32_t>(now)};
         }
 
@@ -78,7 +78,7 @@ VehicleData ServoCalibrationScreen::update(int rawX, int rawY) {
                 _state = State::TestRight;
                 _yUpStart = now; // reset so user must hold again for right limit
             }
-            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
+            _yWasUp = yUp; _yWasDown = yDown; _steeringSwWas = steeringSw;
             return {rawX, THROTTLE_CENTER_RAW, static_cast<uint32_t>(now)};
         }
 
@@ -90,7 +90,7 @@ VehicleData ServoCalibrationScreen::update(int rawX, int rawY) {
                 printResult();
                 showResult();
             }
-            _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
+            _yWasUp = yUp; _yWasDown = yDown; _steeringSwWas = steeringSw;
             return {rawX, THROTTLE_CENTER_RAW, static_cast<uint32_t>(now)};
         }
 
@@ -98,7 +98,7 @@ VehicleData ServoCalibrationScreen::update(int rawX, int rawY) {
             break;
     }
 
-    _yWasUp = yUp; _yWasDown = yDown; _sw1Was = sw1;
+    _yWasUp = yUp; _yWasDown = yDown; _steeringSwWas = steeringSw;
     return makeNeutralCommand(static_cast<uint32_t>(now));
 }
 
@@ -115,7 +115,7 @@ void ServoCalibrationScreen::showTrimCenter() {
     ScreenDriver* driver = getScreenDriver();
     if (!driver) return;
     char instruction[40];
-    snprintf(instruction, sizeof(instruction), "Trim: %+d us\nSW2: done, set lims", trimDeltaMicros());
+    snprintf(instruction, sizeof(instruction), "Trim: %+d us\nSTR: done, set lims", trimDeltaMicros());
     drawCalibrationStep(*driver, "SERVO ALIGNMENT", 2, 4, instruction,
         constrain(ADC_MIDPOINT_RAW + _trimOffsetRaw, 0, ADC_MAX_RAW));
 }
@@ -139,7 +139,7 @@ void ServoCalibrationScreen::showResult() {
     char line1[28], line2[28];
     snprintf(line1, sizeof(line1), "Trim: %d us", newTrim);
     snprintf(line2, sizeof(line2), "Min:%d Max:%d", minMicros, maxMicros);
-    drawCalibrationResult(*driver, "SERVO CAL DONE", line1, line2, "SW2:done - edit ControlConfig.h");
+    drawCalibrationResult(*driver, "SERVO CAL DONE", line1, line2, "THR:back - edit ControlConfig.h");
 }
 
 void ServoCalibrationScreen::printResult() {

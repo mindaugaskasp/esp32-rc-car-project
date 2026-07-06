@@ -24,7 +24,7 @@ private:
 
     bool _yWasUp = false;
     bool _yWasDown = false;
-    bool _sw1Was = false; // JOY1_SW — confirm trim done, proceed
+    bool _steeringSwWas = false; // STEERING_SW — confirm trim done, proceed
     unsigned long _yUpStart = 0;
     unsigned long _yDownStart = 0;
 

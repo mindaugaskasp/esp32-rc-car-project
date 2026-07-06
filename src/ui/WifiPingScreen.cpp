@@ -43,7 +43,7 @@ void WifiPingScreen::show(const PingStats& stats) {
 
     driver->hline(0, 57, ScreenDriver::W);
     driver->font(ScreenFont::Tiny);
-    driver->text(0, 63, "SW2:exit  SW1:reset");
+    driver->text(0, 63, "THR:exit  STR:reset");
 
     driver->flush();
 }

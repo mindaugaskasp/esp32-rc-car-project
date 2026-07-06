@@ -8,6 +8,10 @@
 static const uint8_t ADVERTISEMENT_MAGIC = 0xCA;
 static const uint8_t BROADCAST_MAC[MAC_ADDRESS_LENGTH] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
+// While camping on the rendezvous channel for the transmitter, re-log at this
+// cadence so the serial console shows the receiver is alive and still waiting.
+static const unsigned long WAITING_LOG_INTERVAL_MS = 2000;
+
 struct ChannelAdvertisementPacket {
     uint8_t magic;
     uint8_t channel;
@@ -64,7 +68,7 @@ static void onAdvertisementPacket(const uint8_t* mac, const uint8_t* data, int l
     portEXIT_CRITICAL(&advertisementMux);
 }
 
-uint8_t receiveChannelAdvertisement(const uint8_t* expectedTransmitterMac, uint32_t timeoutMs, uint8_t fallbackChannel) {
+uint8_t waitForChannelAdvertisement(const uint8_t* expectedTransmitterMac) {
     esp_wifi_set_channel(ADVERTISEMENT_CHANNEL, WIFI_SECOND_CHAN_NONE);
 
     portENTER_CRITICAL(&advertisementMux);
@@ -75,27 +79,30 @@ uint8_t receiveChannelAdvertisement(const uint8_t* expectedTransmitterMac, uint3
 
     esp_now_register_recv_cb(onAdvertisementPacket);
 
-    debugLogger.logf("[ADVERT] Listening on ch %d (timeout %lums)", ADVERTISEMENT_CHANNEL, static_cast<unsigned long>(timeoutMs));
+    debugLogger.logf("[ADVERT] Listening on ch %d for transmitter", ADVERTISEMENT_CHANNEL);
 
-    unsigned long startTime = millis();
+    // No operational channel exists until the transmitter announces one, so there is
+    // nothing sensible to fall back to — camp on the rendezvous channel and wait as
+    // long as it takes. The transmitter re-advertises on every boot, so whenever it
+    // powers on the receiver hears it here. The vehicle stays safely neutral meanwhile.
     bool received = false;
     uint8_t channel = 0;
-    while (millis() - startTime < timeoutMs) {
+    unsigned long lastWaitingLog = millis();
+    while (!received) {
         portENTER_CRITICAL(&advertisementMux);
         received = advertisementReceived;
         channel = receivedChannel;
         portEXIT_CRITICAL(&advertisementMux);
         if (received) break;
+        if (millis() - lastWaitingLog >= WAITING_LOG_INTERVAL_MS) {
+            lastWaitingLog = millis();
+            debugLogger.logf("[ADVERT] Still waiting on ch %d for transmitter...", ADVERTISEMENT_CHANNEL);
+        }
         delay(50);
     }
 
     esp_now_unregister_recv_cb();
 
-    if (received) {
-        debugLogger.logf("[ADVERT] Got channel: %d", channel);
-        return channel;
-    }
-
-    debugLogger.logf("[ADVERT] Timeout — falling back to ch %d", fallbackChannel);
-    return fallbackChannel;
+    debugLogger.logf("[ADVERT] Got channel: %d", channel);
+    return channel;
 }

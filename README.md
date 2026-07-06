@@ -316,7 +316,8 @@ Navigate with the transmitter joystick: **Y-tap** up/down scrolls, **X-right tap
 | **Joystick Axis** | Records raw min/centre/max for each joystick axis |
 | **Servo Alignment** | Adjusts the steering servo centre trim |
 | **Low Voltage** | Selects battery cell count, per-cell cutoff voltage, and protection type, then programs rows 12–14 |
-| **Throttle Deadzone** | Sets the neutral dead-band around the throttle stick centre |
+| **Throttle Feel** | Live tuner for throttle response — drive the motor with the throttle stick while the steering stick adjusts deadzone / expo / rate; SW1 cycles the parameter, hold SW1 to save. Prints `THROTTLE_EXPO` / `THROTTLE_RATE` / `JOY_DEADZONE_Y` |
+| **Steering Feel** | Same live tuner for steering — drive the servo with the steering stick while the throttle stick adjusts deadzone / expo / rate. Prints `STEERING_EXPO` / `STEERING_RATE` / `JOY_DEADZONE_X` |
 
 ### ESC Tuning — parameter reference
 

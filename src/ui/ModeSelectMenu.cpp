@@ -14,21 +14,19 @@ void ModeSelectMenu::setEntries(const char* const* names, int8_t count) {
 }
 
 void ModeSelectMenu::onOpen() {
-    _sw1Was = readButton(JOY1_SW_PIN);
-    _sw2Was = readButton(JOY2_SW_PIN);
+    _throttleSwWas = readButton(THROTTLE_SW_PIN);
+    _steeringSwWas = readButton(STEERING_SW_PIN);
 }
 
 void ModeSelectMenu::onClose() {
-    _openJoy1SwWas = readButton(JOY1_SW_PIN);
-    _openJoy2SwWas = readButton(JOY2_SW_PIN);
+    _openSteeringSwWas = readButton(STEERING_SW_PIN);
 }
 
 bool ModeSelectMenu::checkOpenRequest() {
-    bool joy1Sw = readButton(JOY1_SW_PIN);
-    bool joy2Sw = readButton(JOY2_SW_PIN);
-    bool pressed = (joy1Sw && !_openJoy1SwWas) || (joy2Sw && !_openJoy2SwWas);
-    _openJoy1SwWas = joy1Sw;
-    _openJoy2SwWas = joy2Sw;
+    // Steering (enter/go deeper) opens the menu; throttle is reserved for exit/back.
+    bool steeringSw = readButton(STEERING_SW_PIN);
+    bool pressed = steeringSw && !_openSteeringSwWas;
+    _openSteeringSwWas = steeringSw;
     return pressed;
 }
 
@@ -49,7 +47,7 @@ void ModeSelectMenu::show() {
     if (below) driver->scrollText(48, below);
     driver->hline(0, 52, ScreenDriver::W);
     driver->font(ScreenFont::Tiny);
-    driver->text(0, 60, "Y:nav  SW1:select  SW2:back");
+    driver->text(0, 60, "Y:nav  STR:select  THR:exit");
     driver->flush();
 }
 
@@ -57,8 +55,8 @@ ModeSelectMenu::Result ModeSelectMenu::update(int joystickY) {
     unsigned long now = millis();
     bool yUp = joystickY > JOY_GESTURE_UP_RAW;
     bool yDown = joystickY < JOY_GESTURE_DOWN_RAW;
-    bool sw1 = readButton(JOY1_SW_PIN);
-    bool sw2 = readButton(JOY2_SW_PIN);
+    bool throttleSw = readButton(THROTTLE_SW_PIN);
+    bool steeringSw = readButton(STEERING_SW_PIN);
 
     if (yUp && !_yWasUp) _yUpStart = now;
     if (yDown && !_yWasDown) _yDownStart = now;
@@ -73,15 +71,15 @@ ModeSelectMenu::Result ModeSelectMenu::update(int joystickY) {
     }
 
     Result result = Result::None;
-    if (sw1 && !_sw1Was) { // SW1 (throttle stick) = select/confirm
+    if (steeringSw && !_steeringSwWas) { // steering stick = select/confirm (enter)
         result = Result::Selected;
     }
-    if (sw2 && !_sw2Was) { // SW2 (steering stick) = back/cancel
-        result = Result::Cancelled;
+    if (throttleSw && !_throttleSwWas) { // throttle stick = exit to Dashboard (back)
+        result = Result::Exit;
     }
 
     _yWasUp = yUp; _yWasDown = yDown;
-    _sw1Was = sw1; _sw2Was = sw2;
+    _throttleSwWas = throttleSw; _steeringSwWas = steeringSw;
     // No joystick send here — menu navigation takes over Y-axis input while menu is open.
     return result;
 }

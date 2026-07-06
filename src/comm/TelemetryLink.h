@@ -16,7 +16,7 @@ public:
 
     TelemetryData getLatest() const { return _latest; }
     int getLatencyMs() const { return _latestLatencyMs; }
-    uint32_t getRxCount() const { return _rxCount; }
+    uint32_t getReceivedCount() const { return _receivedCount; }
 
     struct RttDrainResult {
         uint32_t sampleCount;
@@ -42,7 +42,7 @@ private:
     portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
     TelemetryData _pending = {};
     volatile bool _pendingAvailable = false;
-    volatile uint32_t _rxCount = 0;
+    volatile uint32_t _receivedCount = 0;
 
     volatile uint32_t _rttSampleCount = 0;
     volatile long _rttSumMs = 0;

@@ -78,7 +78,7 @@ void drawCalibrationMenu(ScreenDriver& driver, const char* above,
 
     driver.hline(0, 50, ScreenDriver::W);
     driver.font(ScreenFont::Tiny);
-    driver.text(0, 58, "Y:nav  SW1:enter  SW2:exit");
+    driver.text(0, 58, "Y:nav  STR:enter  THR:exit");
 
     driver.flush();
 }

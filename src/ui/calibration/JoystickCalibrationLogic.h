@@ -23,7 +23,7 @@ static const int CALIBRATION_ADC_MIDPOINT = 2048;
 static const int CALIBRATION_REST_MAX_OFFSET = 900;
 
 // Integer mean of the resting samples → the axis center raw value. This is what a
-// user copies into JOYSTICK_CENTER_RAW (X) / THROTTLE_CENTER_RAW (Y).
+// user copies into STEERING_CENTER_RAW (X) / THROTTLE_CENTER_RAW (Y).
 inline int computeCenterRaw(long sampleSum, int sampleCount) {
     if (sampleCount <= 0) return CALIBRATION_ADC_MIDPOINT;
     return static_cast<int>(sampleSum / sampleCount);

@@ -10,6 +10,7 @@
 //   ServoConfig.h    — steering-servo PWM range, smoothing, jitter deadband
 //   EscConfig.h      — ESC output deadband, throttle-invert
 //   HallConfig.h     — hall speed-sensor pulses/rev, RPM window, debounce
+//   VehicleConfig.h  — drivetrain geometry (wheel diameter, gear ratio) for km/h
 //
 // All remain #define (not constexpr) for native-test / Arduino parity — see CLAUDE.md.
 
@@ -17,3 +18,4 @@
 #include "config/ServoConfig.h"
 #include "config/EscConfig.h"
 #include "config/HallConfig.h"
+#include "config/VehicleConfig.h"

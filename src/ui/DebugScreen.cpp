@@ -41,13 +41,13 @@ void DebugScreen::showJoystickData(int joystickX, int joystickY, const char* pag
     snprintf(buffer, sizeof(buffer), "Y raw: %d", joystickY);
     driver->text(0, 26, buffer);
 
-    snprintf(buffer, sizeof(buffer), "X delta: %+d", joystickX - JOYSTICK_CENTER_RAW);
+    snprintf(buffer, sizeof(buffer), "X delta: %+d", joystickX - STEERING_CENTER_RAW);
     driver->text(0, 36, buffer);
 
     snprintf(buffer, sizeof(buffer), "Y delta: %+d", joystickY - THROTTLE_CENTER_RAW);
     driver->text(0, 44, buffer);
 
-    drawDebugFooter(*driver, "SW1:menu  SW2:next page");
+    drawDebugFooter(*driver, "THR:menu  STR:next page");
     driver->flush();
 }
 
@@ -70,7 +70,7 @@ void DebugScreen::showTelemetry(float batteryVoltage, int speedRpm, const char* 
     snprintf(buffer, sizeof(buffer), "RX: %lu ms", millis());
     driver->text(0, 36, buffer);
 
-    drawDebugFooter(*driver, "SW1:menu  SW2:next page");
+    drawDebugFooter(*driver, "THR:menu  STR:next page");
     driver->flush();
 }
 
@@ -89,6 +89,6 @@ void DebugScreen::showPacketTrace(bool enabled, const char* pageTag) {
     driver->font(ScreenFont::Tiny);
     driver->text(0, 44, "Heavy UART load - off");
 
-    drawDebugFooter(*driver, "SW1:menu  SW2 hold:toggle");
+    drawDebugFooter(*driver, "THR:menu  STR hold:toggle");
     driver->flush();
 }

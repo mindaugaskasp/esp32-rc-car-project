@@ -26,7 +26,7 @@ void broadcastChannelToReceiver(const ChannelScanResult& scanResult) {
         sendChannelAdvertisement(scanResult.bestChannel);
         int secsLeft = static_cast<int>((CHANNEL_BROADCAST_MS - (millis() - scanShownAt)) / 1000);
         wifiScanScreen.showResult(scanResult, secsLeft, /*broadcasting=*/true);
-        if (readButton(JOY1_SW_PIN) || readButton(JOY2_SW_PIN)) break;
+        if (readButton(THROTTLE_SW_PIN) || readButton(STEERING_SW_PIN)) break;
         delay(200);
     }
     stopChannelBroadcast();

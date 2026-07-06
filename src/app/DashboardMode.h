@@ -32,11 +32,10 @@ private:
     bool _dashboardShown = false;
     unsigned long _setupCompletedAt = 0;
     bool _syncWarningShown = false;
-    float _maxSpeedKmh = 0.0f;
 
     unsigned long _lossWindowStart = 0;
     uint32_t _lossWindowSentBase = 0;
-    uint32_t _lossWindowRxBase = 0;
+    uint32_t _lossWindowReceivedBase = 0;
     int _lossPercent = -1; // -1 = not yet available
     int _jitterMs = -1; // -1 = not yet available
     int _prevRtt = -1;

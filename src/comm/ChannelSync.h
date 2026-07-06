@@ -9,7 +9,7 @@
 //   broadcastChannelToReceiver(scan);            // needs ESP-NOW
 //   applyWifiChannel(scan.bestChannel);
 //
-// Mirrors the receiver's single-call receiveChannelAdvertisement().
+// Mirrors the receiver's single-call waitForChannelAdvertisement().
 
 // Scan for the least congested 2.4GHz channel, showing progress on the WiFi-scan
 // screen. MUST be called BEFORE initEspNow() (see ChannelScanner.h).

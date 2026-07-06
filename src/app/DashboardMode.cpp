@@ -1,17 +1,18 @@
 #include "DashboardMode.h"
+#include "app/SessionTracker.h"
 #include "comm/TelemetryLink.h"
 #include "comm/JoystickSender.h"
+#include "drivers/controls/DebugModeSwitch.h"
 #include "config/ControlConfig.h"
 #include "config/WifiConfig.h"
 #include "ui/Screen.h"
 #include "drivers/display/ScreenDriver.h"
+#include "drivers/hall/SpeedLogic.h"
 #include "ui/ModeSelectMenu.h"
 #include <Arduino.h>
 #include <cmath>
 
 DashboardMode dashboardMode;
-
-static float speedKmh(int rpm) { return rpm * 0.05f; }
 
 void DashboardMode::markSetupComplete() {
     _setupCompletedAt = millis();
@@ -43,41 +44,40 @@ void DashboardMode::updateLinkStats(bool newTelemetry) {
 
     unsigned long now = millis();
     uint32_t sentCount = joystickSender.getSentCount();
-    uint32_t rxCount = telemetryLink.getRxCount();
+    uint32_t receivedCount = telemetryLink.getReceivedCount();
 
     if (_lossWindowStart == 0) {
         _lossWindowStart = now;
         _lossWindowSentBase = sentCount;
-        _lossWindowRxBase = rxCount;
+        _lossWindowReceivedBase = receivedCount;
         return;
     }
     if (now - _lossWindowStart >= LOSS_WINDOW_MS) {
         uint32_t sentInWindow = sentCount - _lossWindowSentBase;
-        uint32_t rxInWindow = rxCount - _lossWindowRxBase;
+        uint32_t receivedInWindow = receivedCount - _lossWindowReceivedBase;
         if (sentInWindow > 0) {
-            uint32_t lostInWindow = (rxInWindow < sentInWindow) ? (sentInWindow - rxInWindow) : 0;
+            uint32_t lostInWindow = (receivedInWindow < sentInWindow) ? (sentInWindow - receivedInWindow) : 0;
             _lossPercent = static_cast<int>(lostInWindow * 100 / sentInWindow);
         }
         _lossWindowStart = now;
         _lossWindowSentBase = sentCount;
-        _lossWindowRxBase = rxCount;
+        _lossWindowReceivedBase = receivedCount;
     }
 }
 
 void DashboardMode::show() {
     TelemetryData latest = telemetryLink.getLatest();
-    float currentSpeedKmh = speedKmh(latest.speedRpm);
-    if (currentSpeedKmh > _maxSpeedKmh) _maxSpeedKmh = currentSpeedKmh;
 
     DashboardData dashboard;
     dashboard.carBatteryVoltage = latest.batteryVoltage;
     dashboard.remoteBatteryVoltage = MOCK_REMOTE_BATTERY_VOLTAGE;
     dashboard.speedRpm = latest.speedRpm;
-    dashboard.speedKmh = currentSpeedKmh;
-    dashboard.maxSpeedKmh = _maxSpeedKmh;
+    dashboard.speedKmh = motorRpmToKmh(latest.speedRpm);
+    dashboard.maxSpeedKmh = sessionTracker.stats().maxSpeedKmh;
     dashboard.latencyMs = telemetryLink.getLatencyMs();
     dashboard.lossPercent = _lossPercent;
     dashboard.jitterMs = _jitterMs;
+    dashboard.debugMode = isDebugModeActive();
     screen.showDashboard(dashboard);
 }
 
@@ -90,12 +90,13 @@ bool DashboardMode::update(int joystickX, int joystickY) {
             showSyncWarning();
             _syncWarningShown = true;
         }
-        joystickSender.send(joystickX, joystickY, JOYSTICK_CENTER_RAW, RECEIVER_MAC);
+        joystickSender.send(joystickX, joystickY, STEERING_CENTER_RAW, RECEIVER_MAC);
         return false;
     }
 
     bool newTelemetry = telemetryLink.process();
     if (newTelemetry) {
+        sessionTracker.recordSpeed(telemetryLink.getLatest().speedRpm);
         if (!_connectionEstablished) {
             _connectionEstablished = true;
             _connectionEstablishedAt = now;
@@ -118,6 +119,6 @@ bool DashboardMode::update(int joystickX, int joystickY) {
         return true;
     }
 
-    joystickSender.send(joystickX, joystickY, JOYSTICK_CENTER_RAW, RECEIVER_MAC);
+    joystickSender.send(joystickX, joystickY, STEERING_CENTER_RAW, RECEIVER_MAC);
     return false;
 }

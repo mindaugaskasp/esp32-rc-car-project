@@ -48,6 +48,7 @@ private:
     unsigned long _lastPacketTime = 0;
     bool _escResetDueToLoss = false;
     int _consecutiveValidCommands = 0; // failsafe arming counter (see ARM_COMMAND_THRESHOLD)
+    bool _linkTwitchDone = false; // one-shot "link established" servo twitch on first real command
 
     uint8_t _operationalChannel = 0;      // the channel we serve commands on
     bool _listeningForResync = false;     // true while hopped to the advertisement channel

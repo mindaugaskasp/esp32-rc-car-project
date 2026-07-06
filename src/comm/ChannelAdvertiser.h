@@ -20,9 +20,10 @@ void stopChannelBroadcast();
 // ── Receiver side ─────────────────────────────────────────────────────────────
 
 // Switch to ADVERTISEMENT_CHANNEL and block until a channel advertisement is received from
-// expectedTransmitterMac, or timeoutMs elapses. Returns the advertised channel, or
-// fallbackChannel on timeout. Packets from other senders are ignored.
-uint8_t receiveChannelAdvertisement(const uint8_t* expectedTransmitterMac, uint32_t timeoutMs, uint8_t fallbackChannel = 6);
+// expectedTransmitterMac, then return the advertised channel. There is no timeout: until the
+// transmitter is heard there is no operational channel to fall back to, so the receiver camps
+// here indefinitely (vehicle stays neutral). Packets from other senders are ignored.
+uint8_t waitForChannelAdvertisement(const uint8_t* expectedTransmitterMac);
 
 // Returns true if (data, len) is a channel advertisement from expectedMac, writing the
 // advertised channel to *outChannel. ISR-safe (no allocation, no Serial) so it can be

@@ -12,7 +12,7 @@ public:
 private:
     // Per-axis flow: measure center, then sweep X, then sweep Y as separate steps
     // so each axis is calibrated on its own and its low/high is shown in isolation.
-    // The two sweep steps are advanced manually with SW1 (no timer) so the user can
+    // The two sweep steps are advanced manually with the steering-stick button (no timer) so the user can
     // take their time hitting each extreme.
     enum class State : uint8_t { Release, MeasureCenter, SweepX, SweepY, Complete };
     State _state = State::Release;
@@ -25,7 +25,7 @@ private:
     // Resting jitter captured during MeasureCenter — drives the suggested deadzone.
     int _restMinX = ADC_MAX_RAW, _restMaxX = 0;
     int _restMinY = ADC_MAX_RAW, _restMaxY = 0;
-    bool _sw1Was = false; // SW1 (throttle stick) advances a sweep step
+    bool _steeringSwWas = false; // steering-stick button advances a sweep step
 
     void showRelease(int secondsLeft);
     void showMeasuring(int progressRaw);

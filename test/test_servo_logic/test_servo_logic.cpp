@@ -1,61 +1,51 @@
 #include <unity.h>
 #include "drivers/servo/ServoLogic.h"
 
-// Config values (from ControlConfig.h):
-//   SERVO_NEUTRAL_MICROS=1500, SERVO_CENTER_TRIM_MICROS=80  -> center=1580
-//   SERVO_MIN_MICROS=500, SERVO_MAX_MICROS=2500
-//   JOY_DEADZONE_X=250, SERVO_JOYSTICK_CENTER_RAW=2048
-//   JOYSTICK_X_MIN=100, JOYSTICK_X_MAX=3950
+// Assertions reference the config symbols directly (SERVO_STEERING_CENTER_RAW,
+// STEERING_JOY_MIN/MAX, SERVO_MIN/MAX_MICROS), so they hold regardless of the tuned
+// values. The only literal below is the trimmed center:
+//   center = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS (1500 + 80 = 1580).
 
 static const int CENTER = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS; // 1580
 
 void setUp() {}
 void tearDown() {}
 
-// --- Center / deadzone ---
+// --- Center reads neutral; deadzone is now removed transmitter-side ---
 
 void test_center_returns_neutral_with_trim() {
-    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW));
+    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_STEERING_CENTER_RAW));
 }
 
-void test_deadzone_left_boundary_still_neutral() {
-    // abs((2048 - JOY_DEADZONE_X) - 2048) = JOY_DEADZONE_X, not > JOY_DEADZONE_X -> still center
-    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW - JOY_DEADZONE_X));
+void test_just_right_of_center_exceeds_center() {
+    TEST_ASSERT_GREATER_THAN(CENTER, computeServoMicros(SERVO_STEERING_CENTER_RAW + 50));
 }
 
-void test_deadzone_right_boundary_still_neutral() {
-    TEST_ASSERT_EQUAL(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW + JOY_DEADZONE_X));
-}
-
-void test_just_outside_deadzone_right_exceeds_center() {
-    TEST_ASSERT_GREATER_THAN(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW + JOY_DEADZONE_X + 1));
-}
-
-void test_just_outside_deadzone_left_below_center() {
-    TEST_ASSERT_LESS_THAN(CENTER, computeServoMicros(SERVO_JOYSTICK_CENTER_RAW - JOY_DEADZONE_X - 1));
+void test_just_left_of_center_below_center() {
+    TEST_ASSERT_LESS_THAN(CENTER, computeServoMicros(SERVO_STEERING_CENTER_RAW - 50));
 }
 
 // --- Calibrated endpoints ---
 
 void test_full_right_returns_servo_max() {
     // map(3950, 2048, 3950, 1580, 2500): (3950-2048)*920/1902 + 1580 = 920 + 1580 = 2500
-    TEST_ASSERT_EQUAL(SERVO_MAX_MICROS, computeServoMicros(JOYSTICK_X_MAX));
+    TEST_ASSERT_EQUAL(SERVO_MAX_MICROS, computeServoMicros(STEERING_JOY_MAX));
 }
 
 void test_full_left_returns_servo_min() {
     // map(100, 100, 2048, 500, 1580): (100-100)*1080/1948 + 500 = 0 + 500 = 500
-    TEST_ASSERT_EQUAL(SERVO_MIN_MICROS, computeServoMicros(JOYSTICK_X_MIN));
+    TEST_ASSERT_EQUAL(SERVO_MIN_MICROS, computeServoMicros(STEERING_JOY_MIN));
 }
 
 // --- Clamping beyond joystick calibration range ---
 
 void test_raw_above_joystick_max_clamped_to_servo_max() {
-    // rawX=4095 maps beyond JOYSTICK_X_MAX and gets clamped to SERVO_MAX_MICROS
+    // rawX=4095 maps beyond STEERING_JOY_MAX and gets clamped to SERVO_MAX_MICROS
     TEST_ASSERT_EQUAL(SERVO_MAX_MICROS, computeServoMicros(4095));
 }
 
 void test_raw_below_joystick_min_clamped_to_servo_min() {
-    // rawX=0 maps below JOYSTICK_X_MIN and gets clamped to SERVO_MIN_MICROS
+    // rawX=0 maps below STEERING_JOY_MIN and gets clamped to SERVO_MIN_MICROS
     TEST_ASSERT_EQUAL(SERVO_MIN_MICROS, computeServoMicros(0));
 }
 
@@ -91,10 +81,8 @@ void test_output_monotonically_non_decreasing() {
 int main(int argc, char **argv) {
     UNITY_BEGIN();
     RUN_TEST(test_center_returns_neutral_with_trim);
-    RUN_TEST(test_deadzone_left_boundary_still_neutral);
-    RUN_TEST(test_deadzone_right_boundary_still_neutral);
-    RUN_TEST(test_just_outside_deadzone_right_exceeds_center);
-    RUN_TEST(test_just_outside_deadzone_left_below_center);
+    RUN_TEST(test_just_right_of_center_exceeds_center);
+    RUN_TEST(test_just_left_of_center_below_center);
     RUN_TEST(test_full_right_returns_servo_max);
     RUN_TEST(test_full_left_returns_servo_min);
     RUN_TEST(test_raw_above_joystick_max_clamped_to_servo_max);

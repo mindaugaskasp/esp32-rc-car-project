@@ -1,5 +1,6 @@
 #include "JoystickSender.h"
 #include "config/ControlConfig.h"
+#include "drivers/controls/InputConditioningLogic.h"
 #include "drivers/debug/DebugLogger.h"
 #include "drivers/debug/PacketTrace.h"
 #include "drivers/radio/EspNowDriver.h"
@@ -34,7 +35,14 @@ void JoystickSender::send(int joystickX, int joystickY, int centerRaw, const uin
     if (quickUpdate || repeatSend || changedSinceLastSend || directionChanged) {
         debugLogger.logJoystick(joystickX, joystickY);
         _prevJoyX = joystickX; _prevJoyY = joystickY;
-        VehicleData data = {joystickX, joystickY, static_cast<uint32_t>(millis())};
+        // Send the conditioned command (deadzone removed, expo/rate applied); the
+        // receiver's map is a plain linear command -> PWM. Gating above stays on the
+        // raw reading so the deadzone still governs when we transmit.
+        int steeringCommand = conditionAxis(joystickX, STEERING_CENTER_RAW, STEERING_JOY_MIN, STEERING_JOY_MAX,
+                                            JOY_DEADZONE_X, STEERING_EXPO, STEERING_RATE);
+        int throttleCommand = conditionAxis(joystickY, THROTTLE_CENTER_RAW, THROTTLE_JOY_MIN, THROTTLE_JOY_MAX,
+                                            JOY_DEADZONE_Y, THROTTLE_EXPO, THROTTLE_RATE);
+        VehicleData data = {steeringCommand, throttleCommand, static_cast<uint32_t>(millis())};
         sendData(data, mac);
         if (isPacketTraceEnabled()) {
             debugLogger.logf("[TRACE] TX cmd x=%d y=%d ts=%lu",

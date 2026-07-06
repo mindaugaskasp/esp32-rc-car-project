@@ -22,11 +22,11 @@ void WifiPingMode::begin() {
     _wantsExit = false;
     // Require SW release before exit/reset registers — the button that selected
     // this mode from the menu is likely still held on the first frame.
-    _sw1Was = readButton(JOY1_SW_PIN);
-    _sw2Was = readButton(JOY2_SW_PIN);
+    _throttleSwWas = readButton(THROTTLE_SW_PIN);
+    _steeringSwWas = readButton(STEERING_SW_PIN);
 
     telemetryLink.drainRttStats(); // discard anything accumulated before entering this mode
-    _lastRxCount = telemetryLink.getRxCount();
+    _lastReceivedCount = telemetryLink.getReceivedCount();
 }
 
 void WifiPingMode::update() {
@@ -49,11 +49,11 @@ void WifiPingMode::update() {
     // iterations — reading only the single latest RTT here would silently
     // undercount and skew avg/min/max whenever replies coalesce like that.
     TelemetryLink::RttDrainResult drained = telemetryLink.drainRttStats();
-    uint32_t currentRxCount = telemetryLink.getRxCount();
+    uint32_t currentReceivedCount = telemetryLink.getReceivedCount();
 
-    if (currentRxCount != _lastRxCount) {
-        _stats.received += (currentRxCount - _lastRxCount);
-        _lastRxCount = currentRxCount;
+    if (currentReceivedCount != _lastReceivedCount) {
+        _stats.received += (currentReceivedCount - _lastReceivedCount);
+        _lastReceivedCount = currentReceivedCount;
     }
 
     if (drained.sampleCount > 0) {
@@ -75,18 +75,18 @@ void WifiPingMode::update() {
         _lastScreenUpdate = now;
     }
 
-    bool sw1 = readButton(JOY1_SW_PIN);
-    bool sw2 = readButton(JOY2_SW_PIN);
+    bool throttleSw = readButton(THROTTLE_SW_PIN);
+    bool steeringSw = readButton(STEERING_SW_PIN);
 
-    if (sw2 && !_sw2Was) {
+    if (throttleSw && !_throttleSwWas) { // throttle = exit/back
         _wantsExit = true;
     }
-    if (sw1 && !_sw1Was) {
+    if (steeringSw && !_steeringSwWas) { // steering = reset stats (the in-mode action)
         begin();
     }
 
-    _sw1Was = sw1;
-    _sw2Was = sw2;
+    _throttleSwWas = throttleSw;
+    _steeringSwWas = steeringSw;
 }
 
 bool WifiPingMode::wantsExit() {

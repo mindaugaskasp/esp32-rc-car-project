@@ -1,12 +1,11 @@
 #include "ScreenDriver.h"
 #include "ScreenDriverFactory.h"
-#include <memory>
 
-static std::unique_ptr<ScreenDriver> screenDriver;
+static ScreenDriver* screenDriver = nullptr;
 
 ScreenDriver* getScreenDriver() {
     if (!screenDriver) {
         screenDriver = createScreenDriver();
     }
-    return screenDriver.get();
+    return screenDriver;
 }
