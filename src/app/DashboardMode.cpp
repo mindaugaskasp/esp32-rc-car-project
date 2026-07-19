@@ -7,6 +7,8 @@
 #include "config/WifiConfig.h"
 #include "ui/Screen.h"
 #include "drivers/display/ScreenDriver.h"
+#include "drivers/battery/BatteryLogic.h"
+#include "drivers/battery/BatteryMonitorDriver.h"
 #include "drivers/hall/SpeedLogic.h"
 #include "ui/ModeSelectMenu.h"
 #include <Arduino.h>
@@ -65,12 +67,24 @@ void DashboardMode::updateLinkStats(bool newTelemetry) {
     }
 }
 
+static int millivoltsFromVolts(float volts) {
+    return static_cast<int>(volts * 1000.0f + 0.5f);
+}
+
 void DashboardMode::show() {
     TelemetryData latest = telemetryLink.getLatest();
+    float remoteBatteryVoltage = getBatteryVoltage();
+
+    _carBatteryLow = updateLowVoltageWarning(_carBatteryLow, millivoltsFromVolts(latest.batteryVoltage),
+                                             BATTERY_CAR_LOW_MILLIVOLTS, BATTERY_WARNING_HYSTERESIS_MILLIVOLTS);
+    _remoteBatteryLow = updateLowVoltageWarning(_remoteBatteryLow, millivoltsFromVolts(remoteBatteryVoltage),
+                                                BATTERY_REMOTE_LOW_MILLIVOLTS, BATTERY_WARNING_HYSTERESIS_MILLIVOLTS);
 
     DashboardData dashboard;
     dashboard.carBatteryVoltage = latest.batteryVoltage;
-    dashboard.remoteBatteryVoltage = MOCK_REMOTE_BATTERY_VOLTAGE;
+    dashboard.remoteBatteryVoltage = remoteBatteryVoltage;
+    dashboard.carBatteryLow = _carBatteryLow;
+    dashboard.remoteBatteryLow = _remoteBatteryLow;
     dashboard.speedRpm = latest.speedRpm;
     dashboard.speedKmh = motorRpmToKmh(latest.speedRpm);
     dashboard.maxSpeedKmh = sessionTracker.stats().maxSpeedKmh;

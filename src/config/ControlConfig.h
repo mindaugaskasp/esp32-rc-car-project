@@ -11,6 +11,7 @@
 //   EscConfig.h      — ESC output deadband, throttle-invert
 //   HallConfig.h     — hall speed-sensor pulses/rev, RPM window, debounce
 //   VehicleConfig.h  — drivetrain geometry (wheel diameter, gear ratio) for km/h
+//   BatteryConfig.h  — battery-sense divider values, sampling, smoothing
 //
 // All remain #define (not constexpr) for native-test / Arduino parity — see CLAUDE.md.
 
@@ -19,3 +20,4 @@
 #include "config/EscConfig.h"
 #include "config/HallConfig.h"
 #include "config/VehicleConfig.h"
+#include "config/BatteryConfig.h"

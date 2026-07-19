@@ -4,7 +4,7 @@
 
 // Font sizes available on all display implementations.
 enum class ScreenFont : uint8_t { Tiny, Small, Medium, Large };
-// Sh1106 mapping:
+// U8g2 mapping (shared by all OLED protocol drivers):
 //   Tiny   -> u8g2_font_4x6_tf
 //   Small  -> u8g2_font_5x7_tf
 //   Medium -> u8g2_font_6x10_tf

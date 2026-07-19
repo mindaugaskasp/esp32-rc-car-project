@@ -1,4 +1,5 @@
 #include "VehicleCommandReceiver.h"
+#include "comm/ArmingLogic.h"
 #include "drivers/radio/EspNowDriver.h"
 #include "comm/ChannelAdvertiser.h"
 #include "comm/ChannelScanner.h"
@@ -7,6 +8,7 @@
 #include "drivers/servo/ServoDriver.h"
 #include "drivers/esc/EscDriver.h"
 #include "drivers/hall/HallSensorDriver.h"
+#include "drivers/battery/BatteryMonitorDriver.h"
 #include "drivers/debug/DebugLogger.h"
 #include <esp_now.h>
 
@@ -49,6 +51,12 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
             : sizeof(_pending.data);
     }
 
+    // Only a well-formed command counts as proof of a live link. Wrong-size
+    // packets are still buffered (so packet tracing can report them) but must
+    // not feed the watchdog — otherwise a stream of undispatched packets could
+    // hold the ESC at its last speed forever.
+    bool validCommandLength = (len == static_cast<int>(sizeof(VehicleData)));
+
     portENTER_CRITICAL(&_mux);
     memcpy(_pending.mac, mac, sizeof(_pending.mac));
     if (copyLength > 0) {
@@ -56,8 +64,17 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
     }
     _pending.len = len;
     _pendingAvailable = true;
-    _lastPacketTime = receivedAt;
-    _escResetDueToLoss = false;
+    if (validCommandLength) {
+        // A command landing after watchdog-length silence must force re-arming
+        // even if update() never got to run during the gap (e.g. loop() was
+        // blocked); clearing _escResetDueToLoss below would otherwise hide the
+        // dropout from the watchdog entirely.
+        if (receivedAt - _lastPacketTime > PACKET_LOSS_TIMEOUT_MS) {
+            _rearmAfterGapPending = true;
+        }
+        _lastPacketTime = receivedAt;
+        _escResetDueToLoss = false;
+    }
     portEXIT_CRITICAL(&_mux);
 }
 
@@ -73,22 +90,33 @@ void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& dat
 
     setServoAngle(data.servoPosition);
 
-    // Failsafe arming: the ESC is held at neutral until a short run of valid
-    // commands has arrived, and re-armed from zero after every packet-loss
-    // timeout (see update()). This guarantees the motor cannot spin from a
-    // single stray in-range packet or on the first frame after a dropout —
-    // steering stays live throughout, only propulsion is gated.
-    if (_consecutiveValidCommands < ARM_COMMAND_THRESHOLD) {
-        _consecutiveValidCommands++;
-        setEscNeutral();
-    } else {
+    // Failsafe arming (see comm/ArmingLogic.h): the ESC is held at neutral until
+    // a short run of near-neutral throttle commands has arrived, re-armed from
+    // zero after every packet-loss timeout. A stray in-range packet can't spin
+    // the motor, and a link that drops at full throttle can't slam back to full
+    // throttle on reconnect — the stick must return home first. Steering stays
+    // live throughout; only propulsion is gated.
+    _armingCount = nextArmingCount(_armingCount, data.escSpeed);
+    if (isArmed(_armingCount)) {
         updateEscSpeed(data.escSpeed);
+    } else {
+        setEscNeutral();
     }
 
+    // Link-mode handshake: the command carries the transmitter's desired PHY. Adopt
+    // it if it differs, but ack the new mode in this telemetry frame and send that
+    // frame FIRST, while both boards are still on the shared PHY — only then switch.
+    // That guarantees the transmitter hears "I'm on the new PHY" before either board
+    // leaves the current one. See comm/LinkModeLogic.h.
+    LinkPhyMode transmitterDesired = linkModeFromWire(data.linkMode);
+    bool adoptLinkMode = rxShouldAdopt(transmitterDesired, _appliedLinkMode);
+    LinkPhyMode nextLinkMode = adoptLinkMode ? transmitterDesired : _appliedLinkMode;
+
     TelemetryData telemetry;
-    telemetry.batteryVoltage = 7.4f; // TODO: replace with ADC voltage divider reading
+    telemetry.batteryVoltage = getBatteryVoltage();
     telemetry.speedRpm = getMotorRpm();
     telemetry.echoTimestampMs = data.txTimestampMs;
+    telemetry.linkMode = linkModeToWire(nextLinkMode);
 
     if (DEBUG_PACKET_TRACE) {
         debugLogger.logf("Received data: servo=%d esc=%d", data.servoPosition, data.escSpeed);
@@ -100,11 +128,19 @@ void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& dat
     } else if (DEBUG_PACKET_TRACE) {
         debugLogger.log("Telemetry packet sent back to sender");
     }
+
+    if (adoptLinkMode) {
+        applyLinkPhyMode(nextLinkMode == LinkPhyMode::LongRange);
+        _appliedLinkMode = nextLinkMode;
+        debugLogger.logf("[LINKMODE] Adopted %s from transmitter",
+                         nextLinkMode == LinkPhyMode::LongRange ? "Long Range" : "Standard");
+    }
 }
 
 void VehicleCommandReceiver::update() {
     PendingPacket packet;
     bool packetAvailable;
+    bool rearmAfterGap;
 
     portENTER_CRITICAL(&_mux);
     packetAvailable = _pendingAvailable;
@@ -112,7 +148,16 @@ void VehicleCommandReceiver::update() {
         memcpy(&packet, &_pending, sizeof(packet));
         _pendingAvailable = false;
     }
+    rearmAfterGap = _rearmAfterGapPending;
+    _rearmAfterGapPending = false;
     portEXIT_CRITICAL(&_mux);
+
+    // Consume before dispatch so the packet that ended the silence is the first
+    // frame of the fresh arming sequence, not a continuation of the old one.
+    if (rearmAfterGap) {
+        _armingCount = 0;
+        debugLogger.log("Command gap exceeded watchdog timeout; re-arming required");
+    }
 
     if (packetAvailable) {
         if (DEBUG_PACKET_TRACE) {
@@ -166,9 +211,12 @@ void VehicleCommandReceiver::update() {
     portEXIT_CRITICAL(&_mux);
 
     if (shouldResetEsc) {
-        _consecutiveValidCommands = 0; // require re-arming before propulsion resumes
+        _armingCount = 0; // require re-arming before propulsion resumes
         setEscNeutral();
-        debugLogger.log("No ESP-NOW packet received recently; ESC reset to neutral");
+        // Center the steering too: coasting with the wheels at the last commanded
+        // lock would swerve the car for as long as the link stays down.
+        setServoAngle(STEERING_CENTER_RAW);
+        debugLogger.log("No ESP-NOW packet received recently; ESC neutral, steering centered");
     }
 
     updateResync(now);
@@ -190,6 +238,16 @@ void VehicleCommandReceiver::updateResync(unsigned long now) {
             _listeningForResync = false;
         }
         return;
+    }
+
+    // Link lost long enough that the transmitter has likely reset. A reset
+    // transmitter comes up on the boot PHY (Standard), so a receiver still on Long
+    // Range would never hear it. Drop back to Standard once here so the two always
+    // re-converge on the PHY the transmitter reboots into.
+    if (_appliedLinkMode != LinkPhyMode::Standard) {
+        applyLinkPhyMode(false);
+        _appliedLinkMode = LinkPhyMode::Standard;
+        debugLogger.log("[LINKMODE] Link lost — reverted PHY to Standard");
     }
 
     // Link lost long enough: alternate between listening on the advertisement

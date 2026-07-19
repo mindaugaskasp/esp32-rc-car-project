@@ -78,9 +78,9 @@ int ResponseTuningScreen::conditionedCommand(int driveRaw) const {
 // rest point so only the actuator under test moves.
 VehicleData ResponseTuningScreen::buildCommand(int conditionedDrive, uint32_t now) const {
     if (_axis == TuningAxis::Throttle) {
-        return VehicleData{STEERING_CENTER_RAW, conditionedDrive, now};
+        return VehicleData{STEERING_CENTER_RAW, conditionedDrive, now, 0};
     }
-    return VehicleData{conditionedDrive, THROTTLE_CENTER_RAW, now};
+    return VehicleData{conditionedDrive, THROTTLE_CENTER_RAW, now, 0};
 }
 
 void ResponseTuningScreen::handleButton(bool steeringSw, unsigned long now) {

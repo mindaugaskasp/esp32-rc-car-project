@@ -7,6 +7,7 @@
 #include "config/WifiConfig.h"
 #include "drivers/controls/Controls.h"
 #include "drivers/controls/DebugModeSwitch.h"
+#include "drivers/battery/BatteryMonitorDriver.h"
 #include "ui/Screen.h"
 #include "ui/WifiPingScreen.h"
 #include "ui/ModeSelectMenu.h"
@@ -17,18 +18,20 @@
 #include "comm/ChannelSync.h"
 #include "comm/TelemetryLink.h"
 #include "comm/JoystickSender.h"
+#include "comm/LinkModeController.h"
 #include "app/DashboardMode.h"
 #include "app/DebugMode.h"
 #include "app/WifiPingMode.h"
 #include "app/SafetyMode.h"
 #include "app/SessionMode.h"
 #include "app/SessionTracker.h"
+#include "app/LinkMode.h"
 
 // ── Top-level mode state machine ────────────────────────────────────────────
 // Each mode's actual per-tick behavior lives in its own class (DashboardMode,
 // DebugMode, WifiPingMode, CalibrationFlow, ModeSelectMenu); this file only owns
 // which mode is active and how modes hand off to one another.
-enum class TransmitterOperatingMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing, Safety, Session, Reboot };
+enum class TransmitterOperatingMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing, Safety, Session, LinkMode, Reboot };
 
 // Seconds shown on the "Rebooting in N..." countdown before ESP.restart().
 static const int REBOOT_COUNTDOWN_SECONDS = 3;
@@ -44,6 +47,7 @@ static constexpr MenuEntry MENU[] = {
     {"Debug Info", TransmitterOperatingMode::Debug, true},
     {"Calibration", TransmitterOperatingMode::Calibration, false},
     {"WiFi Ping", TransmitterOperatingMode::WifiPing, false},
+    {"Long Range", TransmitterOperatingMode::LinkMode, false},
     {"Reboot", TransmitterOperatingMode::Reboot, false},
 };
 static constexpr int8_t MENU_COUNT = sizeof(MENU) / sizeof(MENU[0]);
@@ -87,6 +91,7 @@ static void beginMode(TransmitterOperatingMode mode) {
         case TransmitterOperatingMode::WifiPing: wifiPingMode.begin(); break;
         case TransmitterOperatingMode::Safety: safetyMode.begin(); break;
         case TransmitterOperatingMode::Session: sessionMode.begin(); break;
+        case TransmitterOperatingMode::LinkMode: linkMode.begin(); break;
         case TransmitterOperatingMode::Reboot:
             // Restart the ESP32 in place. The receiver's resync loop re-listens for
             // our channel advertisement on link loss, so the car reconnects without a
@@ -119,6 +124,7 @@ void setup() {
     initButton(THROTTLE_SW_PIN);
     initButton(STEERING_SW_PIN);
     initDebugModeSwitch();
+    initBatteryMonitor();
 
     screen.begin();  // shows "Initializing..."
 
@@ -143,6 +149,7 @@ void setup() {
     sendData(probe, RECEIVER_MAC);
 
     telemetryLink.begin();
+    linkModeController.begin(ESP_NOW_LONG_RANGE);
     sessionTracker.begin();
     debugLogger.log("RC Remote ready");
     screen.showStartup("Waiting for car...");
@@ -175,6 +182,13 @@ void loop() {
     unsigned long now = millis();
     if (now - lastTickMs < LOOP_INTERVAL_MS) return;
     lastTickMs = now;
+
+    updateBatteryMonitor();
+
+    // Advance the PHY-switch handshake every tick, regardless of the active mode:
+    // a switch requested from the Link Mode screen must keep negotiating (and the
+    // revert-to-Standard safety net keep running) after the user returns to driving.
+    linkModeController.update(now);
 
     // Y drives menu navigation and both driving modes; read it always. X is only
     // read in the modes that steer (Dashboard, Debug, Calibration), so ModeSelect
@@ -234,6 +248,13 @@ void loop() {
             sessionMode.update();
             if (sessionMode.wantsExit()) {
                 enterModeSelect(TransmitterOperatingMode::Session);
+            }
+            break;
+
+        case TransmitterOperatingMode::LinkMode:
+            linkMode.update();
+            if (linkMode.wantsExit()) {
+                enterModeSelect(TransmitterOperatingMode::LinkMode);
             }
             break;
 

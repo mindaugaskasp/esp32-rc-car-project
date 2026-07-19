@@ -35,6 +35,7 @@ void TelemetryLink::handleReceive(const uint8_t* mac, const uint8_t* incomingDat
     _pending = t;
     _pendingAvailable = true;
     _receivedCount++;
+    _remoteLinkModeRaw = t.linkMode;
     if (rtt >= 0) {
         _latestLatencyMs = rtt;
         _rttSampleCount++;
@@ -76,6 +77,13 @@ bool TelemetryLink::process() {
         debugLogger.logf("Telemetry: %.2fV %d RPM", received.batteryVoltage, received.speedRpm);
     }
     return true;
+}
+
+uint8_t TelemetryLink::getRemoteLinkModeRaw() const {
+    portENTER_CRITICAL(const_cast<portMUX_TYPE*>(&_mux));
+    uint8_t mode = _remoteLinkModeRaw;
+    portEXIT_CRITICAL(const_cast<portMUX_TYPE*>(&_mux));
+    return mode;
 }
 
 TelemetryLink::RttDrainResult TelemetryLink::drainRttStats() {

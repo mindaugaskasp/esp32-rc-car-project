@@ -5,6 +5,8 @@
 struct DashboardData {
     float carBatteryVoltage;
     float remoteBatteryVoltage;
+    bool carBatteryLow; // latched by DashboardMode (see BatteryLogic.h hysteresis)
+    bool remoteBatteryLow;
     int speedRpm;
     float speedKmh;
     float maxSpeedKmh;

@@ -1,18 +1,9 @@
 #pragma once
 
-#include "drivers/display/ScreenDriver.h"
+#include "drivers/display/protocols/u8g2/U8g2ScreenDriver.h"
 
-class Sh1106ScreenDriver : public ScreenDriver {
+// 1.3" SH1106 128x64 I2C OLED.
+class Sh1106ScreenDriver : public U8g2ScreenDriver {
 public:
-    void init() override;
-    void clear() override;
-    void flush() override;
-    void font(ScreenFont f) override;
-    void text(int x, int y, const char* content) override;
-    void scrollText(int y, const char* content) override;
-    int textW(const char* content) override;
-    void hline(int x, int y, int w) override;
-    void vline(int x, int y, int h) override;
-    void box(int x, int y, int w, int h) override;
-    void frame(int x, int y, int w, int h) override;
+    Sh1106ScreenDriver();
 };

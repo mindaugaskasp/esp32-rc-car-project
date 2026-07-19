@@ -22,6 +22,11 @@ const int STEERING_SW_PIN = 26; // right stick (steering) button — enter / sel
 // the switch elsewhere.
 const int DEBUG_MODE_SWITCH_PIN = 25;
 
+// Battery voltage sense — remote battery + through a divider module (values in
+// BatteryConfig.h), never directly. GPIO 34 is input-only and on ADC1 (usable
+// while WiFi/ESP-NOW is active) — same pin as on the receiver board.
+const int BATTERY_SENSE_PIN = 34;
+
 // I2C pins for the OLED screen
 const int SCREEN_SDA_PIN = 21;
 const int SCREEN_SCL_PIN = 22;

@@ -22,10 +22,11 @@ src/
 ├── config/
 │   ├── ControlConfig.h           # Umbrella — includes the five tuning files below
 │   ├── JoystickConfig.h          # Stick centers, deadzones, inversion, travel endpoints, expo/rate (X & Y)
-│   ├── ServoConfig.h             # Steering-servo PWM range, smoothing, jitter deadband
+│   ├── ServoConfig.h             # Steering-servo PWM range, jitter deadband
 │   ├── EscConfig.h               # ESC output deadband, throttle-invert
 │   ├── HallConfig.h              # Hall speed-sensor pulses/rev, RPM window, debounce
 │   ├── VehicleConfig.h           # Drivetrain geometry (wheel diameter, gear ratio) for km/h
+│   ├── BatteryConfig.h           # Battery-sense divider values, sampling, smoothing
 │   ├── DebugConfig.h             # Per-subsystem debug flags and macros
 │   ├── WifiConfig.h              # MAC addresses, ESP-NOW config
 │   └── controller/               # Board pin maps (hardware wiring, kept apart from tuning)
@@ -40,18 +41,24 @@ src/
 │   │   └── EspNowDriver.h/cpp    # ESP-NOW init, peer management, raw send/receive
 │   ├── display/
 │   │   ├── ScreenDriver.h/cpp    # Raw panel primitive interface (no layout)
-│   │   ├── ScreenDriverFactory   # Constructs the concrete driver
-│   │   └── protocols/sh1106/     # SH1106 OLED implementation
+│   │   ├── ScreenDriverFactory   # I2C bus recovery + controller auto-detect, picks the driver
+│   │   └── protocols/
+│   │       ├── u8g2/             # Shared U8G2-backed primitive implementation
+│   │       ├── sh1106/           # 1.3" SH1106 OLED (fallback when detection is inconclusive)
+│   │       └── ssd1306/          # 0.96" SSD1306 OLED
 │   ├── esc/
 │   │   ├── EscDriver.h/cpp       # ESC PWM output
 │   │   └── EscLogic.h            # Pure speed computation — no Arduino dep, testable
 │   ├── servo/
-│   │   ├── ServoDriver.h/cpp     # Servo PWM output with smoothing
+│   │   ├── ServoDriver.h/cpp     # Servo PWM output with jitter deadband
 │   │   └── ServoLogic.h          # Pure angle computation — no Arduino dep, testable
-│   └── hall/                     # Hall-effect speed sensor (receiver)
-│       ├── HallSensorDriver.h/cpp # Pulse-counting speed sensor (receiver)
-│       ├── HallLogic.h           # Pure RPM computation — no Arduino dep, testable
-│       └── SpeedLogic.h          # Pure motor-RPM → km/h — no Arduino dep, testable (tx dashboard includes it)
+│   ├── hall/                     # Hall-effect speed sensor (receiver)
+│   │   ├── HallSensorDriver.h/cpp # Pulse-counting speed sensor (receiver)
+│   │   ├── HallLogic.h           # Pure RPM computation — no Arduino dep, testable
+│   │   └── SpeedLogic.h          # Pure motor-RPM → km/h — no Arduino dep, testable (tx dashboard includes it)
+│   └── battery/                  # Battery voltage sensing (both boards — car pack on rx, remote cell on tx)
+│       ├── BatteryMonitorDriver.h/cpp # ADC sampling of the divider module, interval + burst-average
+│       └── BatteryLogic.h        # Pure divider/calibration/smoothing math — no Arduino dep, testable
 │
 ├── comm/                         # L1 — messaging built on the radio driver
 │   ├── DataTypes.h               # VehicleData / TelemetryData wire structs (shared contract)
@@ -60,7 +67,10 @@ src/
 │   ├── ChannelSync.h/cpp         # TX-side channel handshake orchestration                          [tx]
 │   ├── TelemetryLink.h/cpp       # Inbound telemetry receipt, dedup, RTT accumulators               [tx]
 │   ├── JoystickSender.h/cpp      # Outgoing joystick send-decision logic                            [tx]
-│   └── VehicleCommandReceiver.h/cpp  # Inbound command receipt, servo/ESC dispatch, loss watchdog   [rx]
+│   ├── LinkModeLogic.h           # Pure PHY-switch (Standard/Long Range) decisions + LinkPhyMode enum [both]
+│   ├── LinkModeController.h/cpp  # TX-side runtime Long Range switch handshake + revert-to-Standard   [tx]
+│   ├── ArmingLogic.h             # Pure ESC failsafe-arming gate — no Arduino dep, testable         [rx]
+│   └── VehicleCommandReceiver.h/cpp  # Inbound command receipt, servo/ESC dispatch, loss watchdog, PHY adopt [rx]
 │
 ├── ui/                           # L2 — screens & menus (transmitter)
 │   ├── Screen.h/cpp              # High-level draw API (DashboardData, showDashboard, …)
@@ -71,6 +81,7 @@ src/
 │   ├── WifiScanScreen.h/cpp      # Startup channel-scan progress/result display
 │   ├── SafetyScreen.h/cpp        # Safety-stop confirmation display
 │   ├── SessionScreen.h/cpp       # Session Data stats + speed-over-time graph
+│   ├── LinkModeScreen.h/cpp      # Link Mode (Standard / Long Range) status display
 │   └── calibration/              # On-screen calibration UI and CalibrationFlow (incl. ResponseTuningScreen feel tuner)
 │
 └── app/                          # L2 — top-level feature modes (transmitter)
@@ -80,7 +91,8 @@ src/
     ├── SafetyMode.h/cpp          # Safety-stop mode: continuous safe-neutral e-stop
     ├── SessionMode.h/cpp         # Session Data mode: stats/graph pages
     ├── SessionTracker.h/cpp      # Accumulates session distance/time/speed from telemetry
-    └── SessionStatsLogic.h       # Pure session-stats accumulation — no Arduino dep, testable
+    ├── SessionStatsLogic.h       # Pure session-stats accumulation — no Arduino dep, testable
+    └── LinkMode.h/cpp            # Link Mode screen: toggle Standard/Long Range, drives LinkModeController
 
 test/
 ├── test_esc_logic/               # Unity tests — ESC speed mapping
@@ -89,7 +101,10 @@ test/
 ├── test_speed_logic/             # Unity tests — motor-RPM → km/h
 ├── test_input_conditioning_logic/ # Unity tests — deadzone/expo/rate conditioning
 ├── test_joystick_calibration_logic/ # Unity tests — calibration center/deadzone suggestion
-└── test_session_stats_logic/     # Unity tests — session-stats accumulation
+├── test_session_stats_logic/     # Unity tests — session-stats accumulation
+├── test_arming_logic/            # Unity tests — ESC failsafe arming gate
+├── test_battery_logic/           # Unity tests — battery divider/calibration/smoothing
+└── test_link_mode_logic/         # Unity tests — PHY-switch adopt/revert/give-up decisions
 ```
 
 Both `main_*.cpp` files are intentionally thin: they own only the top-level mode state machine (transmitter) or the `setup()`/`loop()` wiring (receiver). Per-mode behavior lives in `app/`, ESP-NOW receipt/send-decision logic lives in `comm/`, and views live in `ui/`. When a main file starts accumulating non-trivial logic again, extract it into a new class in the layer that matches its altitude (`comm/`, `ui/`, or `app/`) rather than letting it grow. Keep `drivers/` for peripheral-touching code only — if a new class merely *uses* a driver, it belongs in `comm/`, `ui/`, or `app/`, not `drivers/`.
@@ -547,6 +562,7 @@ directory with cross-board files, as in `comm/`.
 | `comm/ChannelSync.cpp` | receiver |
 | `comm/TelemetryLink.cpp` | receiver |
 | `comm/JoystickSender.cpp` | receiver |
+| `comm/LinkModeController.cpp` | receiver |
 | `ui/` (whole layer) | receiver — not included at all |
 | `app/` (whole layer) | receiver — not included at all |
 
@@ -619,5 +635,7 @@ findings are reported but do not block; override the floor per-invocation, e.g.
 - `loop()` cycle target: 20–50 ms
 - No blocking I/O in `loop()` — use ISR buffer pattern for ESP-NOW
 - Average analog reads over multiple samples to reduce noise (see `Controls.cpp`)
-- Servo smoothing: step toward target each cycle rather than snapping (see `ServoDriver.cpp`)
-- Packet-loss watchdog: reset ESC to neutral if no packet received within timeout
+- Servo jitter deadband: skip writes below `SERVO_DEADBAND_MICROS` (see `ServoDriver.cpp`)
+- Packet-loss watchdog: ESC to neutral and steering to center if no packet received within
+  timeout; propulsion then stays gated until the throttle is seen at neutral again
+  (see `comm/ArmingLogic.h`)

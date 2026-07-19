@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "comm/DataTypes.h"
+#include "comm/LinkModeLogic.h"
 
 // Owns the receiver's ESP-NOW inbound command stream: ISR-safe receipt,
 // dispatch to servo/ESC, telemetry echo-back, and the packet-loss watchdog
@@ -23,12 +24,6 @@ private:
 
     static const unsigned long PACKET_LOSS_TIMEOUT_MS = 500;
 
-    // Failsafe arming: number of consecutive valid commands required before the
-    // ESC is permitted to leave neutral. Re-armed from zero after every
-    // packet-loss timeout. Keep small — the transmitter's idle heartbeat sends
-    // neutral frames, so these first frames cost no real throttle response.
-    static const int ARM_COMMAND_THRESHOLD = 2;
-
     // Channel resync: if the link stays down this long, the transmitter has
     // likely restarted and may have moved to a new WiFi channel. We then hop to
     // the advertisement channel to listen for a fresh channel advertisement,
@@ -47,8 +42,18 @@ private:
 
     unsigned long _lastPacketTime = 0;
     bool _escResetDueToLoss = false;
-    int _consecutiveValidCommands = 0; // failsafe arming counter (see ARM_COMMAND_THRESHOLD)
+    int _armingCount = 0; // failsafe arming counter (see comm/ArmingLogic.h)
+    // Set by the callback when a command arrives after a silence longer than the
+    // watchdog timeout — covers the race where the packet lands before update()
+    // has noticed the dropout, so re-arming is never skipped.
+    volatile bool _rearmAfterGapPending = false;
     bool _linkTwitchDone = false; // one-shot "link established" servo twitch on first real command
+
+    // Currently applied PHY. Boot default is Standard (matches initEspNow); adopts
+    // the transmitter's desired PHY via the handshake in dispatch(), and reverts to
+    // Standard whenever the link is lost long enough to enter resync — so a stranded
+    // Long Range receiver drops back to the PHY the transmitter always reboots into.
+    LinkPhyMode _appliedLinkMode = LinkPhyMode::Standard;
 
     uint8_t _operationalChannel = 0;      // the channel we serve commands on
     bool _listeningForResync = false;     // true while hopped to the advertisement channel

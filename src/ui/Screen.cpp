@@ -6,6 +6,11 @@
 
 Screen screen;
 
+// Low-battery blink: the affected voltage is hidden every other phase. Repaints
+// ride on the telemetry cadence (~300ms heartbeat when idle), so the effective
+// blink is approximate — that's fine for an attention cue.
+static const unsigned long LOW_BATTERY_BLINK_MS = 500;
+
 // Nested-arcs Wi-Fi glyph, 7px wide x 6px tall, built from rectangle primitives
 // (the display driver exposes no per-pixel call, so 1x1 boxes stand in for pixels).
 // yTop is the top row; the icon sits inside the battery row's baseline band.
@@ -65,12 +70,18 @@ void Screen::showDashboard(const DashboardData& dashboard) {
     driver->clear();
 
     // ── Battery row with latency centred between the two voltages ──────────
+    bool lowBatteryBlinkVisible = (millis() / LOW_BATTERY_BLINK_MS) % 2 == 0;
+
     driver->font(ScreenFont::Small);
     snprintf(buffer, sizeof(buffer), "CAR %.2fV", dashboard.carBatteryVoltage);
-    driver->text(0, 10, buffer);
+    if (!dashboard.carBatteryLow || lowBatteryBlinkVisible) {
+        driver->text(0, 10, buffer);
+    }
 
     snprintf(buffer, sizeof(buffer), "%.2fV RMT", dashboard.remoteBatteryVoltage);
-    driver->text(ScreenDriver::W - driver->textW(buffer), 10, buffer);
+    if (!dashboard.remoteBatteryLow || lowBatteryBlinkVisible) {
+        driver->text(ScreenDriver::W - driver->textW(buffer), 10, buffer);
+    }
 
     driver->font(ScreenFont::Tiny);
     bool showWifiIcon = true;
@@ -129,6 +140,15 @@ void Screen::showDashboard(const DashboardData& dashboard) {
     if (dashboard.debugMode) {
         driver->font(ScreenFont::Tiny);
         driver->text(0, ScreenDriver::H - 1, "DEBUG MODE");
+    }
+
+    // ── Low-battery badge — bottom-right, shares the band with the debug badge ──
+    if (dashboard.carBatteryLow || dashboard.remoteBatteryLow) {
+        driver->font(ScreenFont::Tiny);
+        const char* lowBatteryLabel = dashboard.carBatteryLow && dashboard.remoteBatteryLow
+            ? "LOW BATT: CAR+RMT"
+            : (dashboard.carBatteryLow ? "LOW BATT: CAR" : "LOW BATT: RMT");
+        driver->text(ScreenDriver::W - driver->textW(lowBatteryLabel), ScreenDriver::H - 1, lowBatteryLabel);
     }
 
     driver->flush();

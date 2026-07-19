@@ -1,6 +1,6 @@
 #pragma once
 
-// Steering-servo output tuning (PWM pulse widths, smoothing, jitter suppression).
+// Steering-servo output tuning (PWM pulse widths, jitter suppression).
 // Kept as #define for native-test / Arduino parity — see CLAUDE.md.
 
 // Steering servo pulse range. Tune center trim if the wheels are not straight
@@ -10,7 +10,6 @@
 #define SERVO_NEUTRAL_MICROS 1500
 #define SERVO_MAX_MICROS 2500
 #define SERVO_CENTER_TRIM_MICROS 0
-#define SERVO_SMOOTHING_STEP_MICROS 150 // Increased for speed
 
 // Minimum µs change required before writing a new position to the servo.
 // Suppresses jitter from ADC noise (~5-20 ADC units → ~2-10 µs at mid-throw).

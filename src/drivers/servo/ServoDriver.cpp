@@ -30,17 +30,3 @@ void twitchServo() {
     servo.writeMicroseconds(centerMicros);
     currentServoMicros = centerMicros;
 }
-
-void updateServo(int rawX) {
-    int targetMicros = computeServoMicros(rawX);
-
-    if (targetMicros > currentServoMicros + SERVO_SMOOTHING_STEP_MICROS) {
-        currentServoMicros += SERVO_SMOOTHING_STEP_MICROS;
-    } else if (targetMicros < currentServoMicros - SERVO_SMOOTHING_STEP_MICROS) {
-        currentServoMicros -= SERVO_SMOOTHING_STEP_MICROS;
-    } else {
-        currentServoMicros = targetMicros;
-    }
-
-    servo.writeMicroseconds(currentServoMicros);
-}

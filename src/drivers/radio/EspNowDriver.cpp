@@ -1,6 +1,7 @@
 #include "EspNowDriver.h"
 #include "config/WifiConfig.h"
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <WiFi.h>
 #include "drivers/debug/DebugLogger.h"
 
@@ -19,8 +20,29 @@ static const char* espNowErrorToString(esp_err_t code) {
     }
 }
 
+void applyLinkPhyMode(bool longRange) {
+    // Must run after the WiFi driver is started (WiFi.mode() / esp_now_init() have
+    // done so). Keep B/G/N alongside LR so the interface still supports standard
+    // rates; LR alone would make it LR-only. LR is Espressif-proprietary, so it
+    // only interoperates ESP32-to-ESP32.
+    uint8_t protocols = WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N;
+    if (longRange) protocols |= WIFI_PROTOCOL_LR;
+    esp_err_t protocolResult = esp_wifi_set_protocol(WIFI_IF_STA, protocols);
+    if (protocolResult != ESP_OK) {
+        debugLogger.logf("Failed to set PHY protocol (LR=%d): %d", longRange ? 1 : 0, protocolResult);
+    } else {
+        debugLogger.logf("PHY set to %s", longRange ? "Long Range" : "Standard");
+    }
+}
+
 void initEspNow() {
     WiFi.mode(WIFI_STA);
+
+    // Boot PHY: ESP_NOW_LONG_RANGE is the compile-time default. Long Range can also
+    // be toggled at runtime from the transmitter's Link Mode screen; that state is
+    // session-only, so every board comes up on this default ("usual mode").
+    applyLinkPhyMode(ESP_NOW_LONG_RANGE);
+
     esp_err_t initResult = esp_now_init();
     if (initResult != ESP_OK) {
         debugLogger.logf("Failed to initialize ESP-NOW: %d", initResult);
@@ -64,8 +86,16 @@ void printMacAddress() {
 
 #ifdef IS_TRANSMITTER
 static unsigned long lastSendTimeMs = 0;
+static uint8_t outgoingLinkMode = 0; // LinkPhyMode stamped on every outgoing frame
+
+void setOutgoingLinkMode(uint8_t mode) {
+    outgoingLinkMode = mode;
+}
 
 void sendData(VehicleData data, const uint8_t* mac) {
+    // Stamp the transmitter's current desired PHY onto every frame so the receiver
+    // always learns of a mode change regardless of which send site produced it.
+    data.linkMode = outgoingLinkMode;
     esp_err_t result = esp_now_send(mac, reinterpret_cast<const uint8_t*>(&data), sizeof(data));
     if (result != ESP_OK) {
         debugLogger.logf("ESP-NOW send failed: %d", result);

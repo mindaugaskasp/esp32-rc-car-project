@@ -5,6 +5,7 @@
 #include "drivers/servo/ServoDriver.h"
 #include "drivers/esc/EscDriver.h"
 #include "drivers/hall/HallSensorDriver.h"
+#include "drivers/battery/BatteryMonitorDriver.h"
 #include "drivers/radio/EspNowDriver.h"
 #include "comm/ChannelScanner.h"
 #include "comm/ChannelAdvertiser.h"
@@ -19,7 +20,8 @@ void setup() {
     initServo();
     initEsc();
     initHallSensor();
-    debugLogger.log("Servo, ESC, and Hall sensor initialized");
+    initBatteryMonitor();
+    debugLogger.log("Servo, ESC, Hall sensor, and battery monitor initialized");
 
     initEspNow();
 
@@ -37,6 +39,7 @@ void setup() {
 
 void loop() {
     updateHallSensor();
+    updateBatteryMonitor();
     vehicleCommandReceiver.update();
 
     // Bench aid, off by default; enable DEBUG_HALL_TO_SERIAL to verify the sensor

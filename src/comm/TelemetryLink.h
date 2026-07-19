@@ -18,6 +18,12 @@ public:
     int getLatencyMs() const { return _latestLatencyMs; }
     uint32_t getReceivedCount() const { return _receivedCount; }
 
+    // The receiver's applied PHY (LinkPhyMode) from the most recent telemetry.
+    // Read straight from the ISR-updated field (not the dedup'd _latest) so the
+    // link-mode negotiator sees every echo, including PHY-only changes that the
+    // change-detection in process() would otherwise swallow.
+    uint8_t getRemoteLinkModeRaw() const;
+
     struct RttDrainResult {
         uint32_t sampleCount;
         long sumMs;
@@ -43,6 +49,7 @@ private:
     TelemetryData _pending = {};
     volatile bool _pendingAvailable = false;
     volatile uint32_t _receivedCount = 0;
+    volatile uint8_t _remoteLinkModeRaw = 0; // receiver's applied PHY from the last echo
 
     volatile uint32_t _rttSampleCount = 0;
     volatile long _rttSumMs = 0;

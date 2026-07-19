@@ -25,7 +25,6 @@ private:
     static const unsigned long CONNECTION_MESSAGE_MS = 3000;
     static const unsigned long NO_CONNECTION_TIMEOUT_MS = 15000;
     static const unsigned long LOSS_WINDOW_MS = 5000; // recompute loss% over this rolling window
-    static constexpr float MOCK_REMOTE_BATTERY_VOLTAGE = 4.10f;
 
     bool _connectionEstablished = false;
     unsigned long _connectionEstablishedAt = 0;
@@ -39,6 +38,9 @@ private:
     int _lossPercent = -1; // -1 = not yet available
     int _jitterMs = -1; // -1 = not yet available
     int _prevRtt = -1;
+
+    bool _carBatteryLow = false; // hysteresis latches (see BatteryLogic.h)
+    bool _remoteBatteryLow = false;
 };
 
 extern DashboardMode dashboardMode;

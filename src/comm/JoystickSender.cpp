@@ -42,7 +42,7 @@ void JoystickSender::send(int joystickX, int joystickY, int centerRaw, const uin
                                             JOY_DEADZONE_X, STEERING_EXPO, STEERING_RATE);
         int throttleCommand = conditionAxis(joystickY, THROTTLE_CENTER_RAW, THROTTLE_JOY_MIN, THROTTLE_JOY_MAX,
                                             JOY_DEADZONE_Y, THROTTLE_EXPO, THROTTLE_RATE);
-        VehicleData data = {steeringCommand, throttleCommand, static_cast<uint32_t>(millis())};
+        VehicleData data = {steeringCommand, throttleCommand, static_cast<uint32_t>(millis()), 0};
         sendData(data, mac);
         if (isPacketTraceEnabled()) {
             debugLogger.logf("[TRACE] TX cmd x=%d y=%d ts=%lu",
