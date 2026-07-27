@@ -4,6 +4,7 @@
 #include "config/ControlConfig.h"
 #include "config/DebugConfig.h"
 #include "drivers/debug/DebugLogger.h"
+#include "drivers/debug/StatusLedDriver.h"
 #include "config/WifiConfig.h"
 #include "drivers/controls/Controls.h"
 #include "drivers/controls/DebugModeSwitch.h"
@@ -117,9 +118,22 @@ static void enterModeSelect(TransmitterOperatingMode from) {
     modeSelectMenu.show();
 }
 
+// Channel the link operates on once the startup handshake picks it — kept so the
+// loop can re-advertise it if the receiver ever falls out of sync.
+static uint8_t operationalChannel = 0;
+
+// Status LED: white booting, green blink once running but with no car linked yet,
+// blue blink once telemetry is flowing. See docs/status-led.md.
+static const uint16_t STATUS_BLINK_PERIOD_MS = 250;
+// Telemetry silence beyond this marks the link down on the LED. Comfortably above
+// the 300ms keep-alive cadence so a single dropped echo doesn't flicker it red.
+static const unsigned long LINK_LED_TIMEOUT_MS = 1000;
+
 void setup() {
     Serial.begin(BAUD_RATE);
-    delay(500);
+    delay(500);  // also lets the RMT/USB settle so the first WS2812 write below isn't dropped
+    initStatusLed();
+    setStatusLed(StatusColor::White);  // booting — solid white through setup(); stays lit if setup() stalls
 
     initButton(THROTTLE_SW_PIN);
     initButton(STEERING_SW_PIN);
@@ -139,6 +153,7 @@ void setup() {
     // Advertise the chosen channel to the receiver, then switch to it.
     broadcastChannelToReceiver(scanResult);
     applyWifiChannel(scanResult.bestChannel);
+    operationalChannel = scanResult.bestChannel;
 
     screen.showStartup("Registering peer...");
     addPeer(RECEIVER_MAC);
@@ -154,6 +169,7 @@ void setup() {
     debugLogger.log("RC Remote ready");
     screen.showStartup("Waiting for car...");
     dashboardMode.markSetupComplete();
+    blinkStatusLed(StatusColor::Green, STATUS_BLINK_PERIOD_MS); // running; no car heard yet
 }
 
 // Keep-alive cadence: if a mode sent nothing this recently (idle stick, or the
@@ -182,6 +198,30 @@ void loop() {
     unsigned long now = millis();
     if (now - lastTickMs < LOOP_INTERVAL_MS) return;
     lastTickMs = now;
+
+    // Telemetry arriving is the transmitter's only proof the car is reachable; it
+    // drives both the status LED and the re-advertise fallback below.
+    static uint32_t lastTelemetryCount = 0;
+    const uint32_t telemetryCount = telemetryLink.getReceivedCount();
+    const bool telemetryReceived = telemetryCount != lastTelemetryCount;
+    lastTelemetryCount = telemetryCount;
+
+    static unsigned long lastTelemetryMs = 0;
+    if (telemetryReceived) lastTelemetryMs = now;
+    const bool linkAlive = lastTelemetryMs > 0 && now - lastTelemetryMs < LINK_LED_TIMEOUT_MS;
+
+    // Re-arm only on a state flip, otherwise the blink phase resets every tick.
+    static bool lastLinkAlive = false;
+    if (linkAlive != lastLinkAlive) {
+        lastLinkAlive = linkAlive;
+        blinkStatusLed(linkAlive ? StatusColor::Blue : StatusColor::Green, STATUS_BLINK_PERIOD_MS);
+    }
+    updateStatusLed();
+
+    // Without this the receiver can never rejoin on its own: it listens on the
+    // advertisement channel after a dropout, but the transmitter only advertised
+    // once at boot, so recovery used to require rebooting the transmitter.
+    updateChannelReadvertise(now, operationalChannel, telemetryReceived);
 
     updateBatteryMonitor();
 

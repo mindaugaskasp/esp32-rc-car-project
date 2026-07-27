@@ -71,11 +71,14 @@ bool TelemetryLink::process() {
                          static_cast<unsigned long>(received.echoTimestampMs));
     }
 
+#if DEBUG_LOG_MIN_INTERVAL_MS > 0
     unsigned long now = millis();
-    if (now - _lastLogTime >= DEBUG_LOG_MIN_INTERVAL_MS) {
-        _lastLogTime = now;
-        debugLogger.logf("Telemetry: %.2fV %d RPM", received.batteryVoltage, received.speedRpm);
+    if (now - _lastLogTime < DEBUG_LOG_MIN_INTERVAL_MS) {
+        return true;
     }
+    _lastLogTime = now;
+#endif
+    debugLogger.logf("Telemetry: %.2fV %d RPM", received.batteryVoltage, received.speedRpm);
     return true;
 }
 

@@ -14,9 +14,6 @@ static const uint8_t MAC_ADDRESS_LENGTH = 6;
 // every boot, so both boards always power up agreeing on the PHY.
 static const bool ESP_NOW_LONG_RANGE = false;
 
-// Set the peer MAC address for the receiver board here.
-// Use the receiver's printed MAC address from Serial monitor.
-static const uint8_t RECEIVER_MAC[MAC_ADDRESS_LENGTH] = {0x30, 0x76, 0xF5, 0xA6, 0x55, 0x58};
+static const uint8_t RECEIVER_MAC[MAC_ADDRESS_LENGTH] = {0x1C, 0xDB, 0xD4, 0x9D, 0x8D, 0xE0};
 
-// Optional: retain the transmitter MAC if you ever need it.
-static const uint8_t TRANSMITTER_MAC[MAC_ADDRESS_LENGTH] = {0x68, 0x09, 0x47, 0x9C, 0xE4, 0xE4};
+static const uint8_t TRANSMITTER_MAC[MAC_ADDRESS_LENGTH] = {0xE0, 0x72, 0xA1, 0xD2, 0x42, 0xF4};

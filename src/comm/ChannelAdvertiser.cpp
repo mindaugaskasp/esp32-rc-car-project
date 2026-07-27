@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <config/WifiConfig.h>
 #include <drivers/debug/DebugLogger.h>
+#include <drivers/debug/StatusLedDriver.h>
 
 static const uint8_t ADVERTISEMENT_MAGIC = 0xCA;
 static const uint8_t BROADCAST_MAC[MAC_ADDRESS_LENGTH] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -98,6 +99,7 @@ uint8_t waitForChannelAdvertisement(const uint8_t* expectedTransmitterMac) {
             lastWaitingLog = millis();
             debugLogger.logf("[ADVERT] Still waiting on ch %d for transmitter...", ADVERTISEMENT_CHANNEL);
         }
+        updateStatusLed(); // this wait blocks setup(); keep the status blink animating
         delay(50);
     }
 

@@ -28,12 +28,14 @@ void DebugLogger::logJoystick(int joystickX, int joystickY) {
     if (!DEBUG_JOYSTICK_TO_SERIAL) {
         return;
     }
+#if DEBUG_LOG_MIN_INTERVAL_MS > 0
     static unsigned long lastLogTime = 0;
     unsigned long now = millis();
     if (now - lastLogTime < DEBUG_LOG_MIN_INTERVAL_MS) {
         return;
     }
     lastLogTime = now;
+#endif
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "[JOY]: X=%d Y=%d", joystickX, joystickY);
     logSerial(buffer);
@@ -52,12 +54,14 @@ void DebugLogger::logHallRpm(int rpm) {
     if (!DEBUG_HALL_TO_SERIAL) {
         return;
     }
+#if DEBUG_LOG_MIN_INTERVAL_MS > 0
     static unsigned long lastLogTime = 0;
     unsigned long now = millis();
     if (now - lastLogTime < DEBUG_LOG_MIN_INTERVAL_MS) {
         return;
     }
     lastLogTime = now;
+#endif
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "[HALL]: rpm=%d", rpm);
     logSerial(buffer);

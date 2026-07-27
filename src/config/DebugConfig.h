@@ -24,7 +24,7 @@
 // Minimum time between repeated [JOY] / Telemetry log lines, so the serial
 // monitor stays readable instead of scrolling by every ~20-100ms. Raise this
 // for an even slower feed while eyeballing wiring/calibration values.
-#define DEBUG_LOG_MIN_INTERVAL_MS 500
+#define DEBUG_LOG_MIN_INTERVAL_MS 0
 
 // Dwell time per rotating dashboard link-stat (latency / loss / jitter) shown in
 // the battery row while the transmitter's physical DEBUG switch is ON (see

@@ -11,6 +11,10 @@ public:
     void begin(); // registers the ESP-NOW receive callback
     void update(); // call every loop(): dispatches pending packets, runs the watchdog
 
+    // True once a real command has arrived and the stream is still inside the
+    // watchdog window — i.e. the transmitter link is up right now.
+    bool isLinkAlive() const;
+
     // ESP-NOW callback entry point. Public only because the C callback API
     // can't reach a private member — not part of the intended call surface.
     void handleReceive(const uint8_t* mac, const uint8_t* incomingData, int len);
@@ -48,6 +52,9 @@ private:
     // has noticed the dropout, so re-arming is never skipped.
     volatile bool _rearmAfterGapPending = false;
     bool _linkTwitchDone = false; // one-shot "link established" servo twitch on first real command
+    // _lastPacketTime is seeded in begin(), so it alone can't distinguish "never
+    // heard the transmitter" from "link up"; this flag makes that distinction.
+    volatile bool _commandEverReceived = false;
 
     // Currently applied PHY. Boot default is Standard (matches initEspNow); adopts
     // the transmitter's desired PHY via the handshake in dispatch(), and reverts to

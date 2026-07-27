@@ -74,8 +74,17 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
         }
         _lastPacketTime = receivedAt;
         _escResetDueToLoss = false;
+        _commandEverReceived = true;
     }
     portEXIT_CRITICAL(&_mux);
+}
+
+bool VehicleCommandReceiver::isLinkAlive() const {
+    portENTER_CRITICAL(const_cast<portMUX_TYPE*>(&_mux));
+    const bool everReceived = _commandEverReceived;
+    const unsigned long lastPacket = _lastPacketTime;
+    portEXIT_CRITICAL(const_cast<portMUX_TYPE*>(&_mux));
+    return everReceived && (millis() - lastPacket) <= PACKET_LOSS_TIMEOUT_MS;
 }
 
 void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& data) {
