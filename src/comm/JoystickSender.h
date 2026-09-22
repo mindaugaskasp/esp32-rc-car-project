@@ -14,7 +14,7 @@ public:
     uint32_t getSentCount() const { return _sentCount; }
 
 private:
-    static const unsigned long SEND_REPEAT_MS = 100;
+    static constexpr unsigned long SEND_REPEAT_MS = 100;
 
     int _prevJoyX = -1, _prevJoyY = -1;
     int _lastSentX = -1, _lastSentY = -1;

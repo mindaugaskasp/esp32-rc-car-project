@@ -35,7 +35,7 @@
 enum class TransmitterOperatingMode : uint8_t { Dashboard, Debug, ModeSelect, Calibration, WifiPing, Safety, Session, LinkMode, Reboot };
 
 // Seconds shown on the "Rebooting in N..." countdown before ESP.restart().
-static const int REBOOT_COUNTDOWN_SECONDS = 3;
+static constexpr int REBOOT_COUNTDOWN_SECONDS = 3;
 
 // Single source of truth for the mode menu: display label ↔ mode. The menu rows,
 // the menu cursor, and the selection dispatch all derive from this table, so
@@ -124,10 +124,10 @@ static uint8_t operationalChannel = 0;
 
 // Status LED: white booting, green blink once running but with no car linked yet,
 // blue blink once telemetry is flowing. See docs/status-led.md.
-static const uint16_t STATUS_BLINK_PERIOD_MS = 250;
+static constexpr uint16_t STATUS_BLINK_PERIOD_MS = 250;
 // Telemetry silence beyond this marks the link down on the LED. Comfortably above
 // the 300ms keep-alive cadence so a single dropped echo doesn't flicker it red.
-static const unsigned long LINK_LED_TIMEOUT_MS = 1000;
+static constexpr unsigned long LINK_LED_TIMEOUT_MS = 1000;
 
 void setup() {
     Serial.begin(BAUD_RATE);
@@ -177,13 +177,13 @@ void setup() {
 // emits a neutral command so the receiver keeps hearing a steady frame. That
 // lets the receiver treat true silence as a lost link (triggering channel
 // resync) rather than mistaking an idle pause for a disconnect.
-static const unsigned long HEARTBEAT_INTERVAL_MS = 300;
+static constexpr unsigned long HEARTBEAT_INTERVAL_MS = 300;
 
 // Non-blocking loop cadence. The loop body runs at most once per interval and
 // returns immediately in between (no delay()), so the framework's WiFi/ESP-NOW
 // background tasks and any pending telemetry are serviced promptly instead of
 // the loop sitting blocked. Target cycle stays in the 20-50ms window.
-static const unsigned long LOOP_INTERVAL_MS = 20;
+static constexpr unsigned long LOOP_INTERVAL_MS = 20;
 
 static int readJoystickX() {
     return applyAxisInvert(readInput(STEERING_X_PIN), JOY_INVERT_X, ADC_MAX_RAW);
@@ -193,19 +193,17 @@ static int readJoystickY() {
     return applyAxisInvert(readInput(THROTTLE_Y_PIN), JOY_INVERT_Y, ADC_MAX_RAW);
 }
 
-void loop() {
-    static unsigned long lastTickMs = 0;
-    unsigned long now = millis();
-    if (now - lastTickMs < LOOP_INTERVAL_MS) return;
-    lastTickMs = now;
-
-    // Telemetry arriving is the transmitter's only proof the car is reachable; it
-    // drives both the status LED and the re-advertise fallback below.
+// Telemetry arriving is the transmitter's only proof the car is reachable; it
+// drives both the status LED and the re-advertise fallback.
+static bool pollTelemetryArrival() {
     static uint32_t lastTelemetryCount = 0;
     const uint32_t telemetryCount = telemetryLink.getReceivedCount();
-    const bool telemetryReceived = telemetryCount != lastTelemetryCount;
+    const bool received = telemetryCount != lastTelemetryCount;
     lastTelemetryCount = telemetryCount;
+    return received;
+}
 
+static void updateLinkStatusLed(unsigned long now, bool telemetryReceived) {
     static unsigned long lastTelemetryMs = 0;
     if (telemetryReceived) lastTelemetryMs = now;
     const bool linkAlive = lastTelemetryMs > 0 && now - lastTelemetryMs < LINK_LED_TIMEOUT_MS;
@@ -217,24 +215,9 @@ void loop() {
         blinkStatusLed(linkAlive ? StatusColor::Blue : StatusColor::Green, STATUS_BLINK_PERIOD_MS);
     }
     updateStatusLed();
+}
 
-    // Without this the receiver can never rejoin on its own: it listens on the
-    // advertisement channel after a dropout, but the transmitter only advertised
-    // once at boot, so recovery used to require rebooting the transmitter.
-    updateChannelReadvertise(now, operationalChannel, telemetryReceived);
-
-    updateBatteryMonitor();
-
-    // Advance the PHY-switch handshake every tick, regardless of the active mode:
-    // a switch requested from the Link Mode screen must keep negotiating (and the
-    // revert-to-Standard safety net keep running) after the user returns to driving.
-    linkModeController.update(now);
-
-    // Y drives menu navigation and both driving modes; read it always. X is only
-    // read in the modes that steer (Dashboard, Debug, Calibration), so ModeSelect
-    // and WifiPing don't pay for an unused ADC burst each tick.
-    int joystickY = readJoystickY();
-
+static void updateActiveMode(int joystickY) {
     switch (currentMode) {
         case TransmitterOperatingMode::Dashboard:
             if (dashboardMode.update(readJoystickX(), joystickY)) {
@@ -301,12 +284,43 @@ void loop() {
         case TransmitterOperatingMode::Reboot:
             break;  // never a resident mode — beginMode() restarts the ESP32 on selection
     }
+}
 
-    // Heartbeat — see HEARTBEAT_INTERVAL_MS. Neutral is the correct thing to send
-    // while idle or navigating the menu (the car should not move), and it keeps
-    // the link warm for the receiver's disconnect detection.
+// Heartbeat — see HEARTBEAT_INTERVAL_MS. Neutral is the correct thing to send while
+// idle or navigating the menu (the car should not move), and it keeps the link warm
+// for the receiver's disconnect detection.
+static void sendHeartbeatIfDue() {
     if (millisSinceLastSend() >= HEARTBEAT_INTERVAL_MS) {
         VehicleData heartbeat = makeNeutralCommand(static_cast<uint32_t>(millis()));
         sendData(heartbeat, RECEIVER_MAC);
     }
+}
+
+void loop() {
+    static unsigned long lastTickMs = 0;
+    const unsigned long now = millis();
+    if (now - lastTickMs < LOOP_INTERVAL_MS) return;
+    lastTickMs = now;
+
+    const bool telemetryReceived = pollTelemetryArrival();
+    updateLinkStatusLed(now, telemetryReceived);
+
+    // Without this the receiver can never rejoin on its own: it listens on the
+    // advertisement channel after a dropout, but the transmitter only advertised
+    // once at boot, so recovery used to require rebooting the transmitter.
+    updateChannelReadvertise(now, operationalChannel, telemetryReceived);
+
+    updateBatteryMonitor();
+
+    // Advance the PHY-switch handshake every tick, regardless of the active mode:
+    // a switch requested from the Link Mode screen must keep negotiating (and the
+    // revert-to-Standard safety net keep running) after the user returns to driving.
+    linkModeController.update(now);
+
+    // Y drives menu navigation and both driving modes, so it is read every tick. X
+    // is read only inside the modes that steer, so ModeSelect and WifiPing don't pay
+    // for an unused ADC burst.
+    updateActiveMode(readJoystickY());
+
+    sendHeartbeatIfDue();
 }

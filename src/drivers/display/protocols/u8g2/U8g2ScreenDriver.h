@@ -16,7 +16,7 @@ public:
     void init() override;
     void clear() override;
     void flush() override;
-    void font(ScreenFont f) override;
+    void font(ScreenFont fontChoice) override;
     void text(int x, int y, const char* content) override;
     void scrollText(int y, const char* content) override;
     int textW(const char* content) override;

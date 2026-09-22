@@ -9,7 +9,7 @@
 // Steering (X) stick rest point, in ADC units. The physical stick does NOT rest
 // at the nominal ADC_MIDPOINT_RAW; set this from calibration. Also the servo-center
 // reference.
-#define STEERING_CENTER_RAW 1852
+#define STEERING_CENTER_RAW 1952
 
 // Per-axis band around the rest point where movement is ignored. Keep just above
 // the stick's resting jitter: too low and a released stick drifts past it (servo
@@ -36,7 +36,7 @@
 // and menu navigation share one orientation. This is the axis-level flip; THROTTLE_INVERT
 // (EscConfig.h) mirrors only the ESC output — enabling both on throttle cancels out.
 #define JOY_INVERT_X false
-#define JOY_INVERT_Y true
+#define JOY_INVERT_Y false
 
 // Steering (X) full-deflection endpoints, in ADC units. Defaults are the full range;
 // tighten to the logged travel[min..max] for fuller servo throw before the stops.
@@ -46,7 +46,7 @@
 // Throttle (Y) rest point and full-deflection endpoints, in ADC units. The ESC neutral
 // band is centered on THROTTLE_CENTER_RAW, so an accurate value is what keeps the motor
 // stopped at rest — set it from calibration, not the nominal ADC_MIDPOINT_RAW.
-#define THROTTLE_CENTER_RAW 2252
+#define THROTTLE_CENTER_RAW 1913
 #define THROTTLE_JOY_MIN 0
 #define THROTTLE_JOY_MAX 4095
 

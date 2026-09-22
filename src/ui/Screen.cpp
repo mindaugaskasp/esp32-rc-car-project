@@ -3,13 +3,19 @@
 #include "config/DebugConfig.h"
 #include <Arduino.h>
 #include <stdio.h>
+#include "ui/ScreenUtils.h"
 
 Screen screen;
 
 // Low-battery blink: the affected voltage is hidden every other phase. Repaints
 // ride on the telemetry cadence (~300ms heartbeat when idle), so the effective
 // blink is approximate — that's fine for an attention cue.
-static const unsigned long LOW_BATTERY_BLINK_MS = 500;
+static constexpr unsigned long LOW_BATTERY_BLINK_MS = 500;
+
+// Latency / loss / jitter share one slot, cycling every DASHBOARD_STAT_DWELL_MS.
+static constexpr int DASHBOARD_STAT_SLOT_COUNT = 3;
+// Distance the Wi-Fi icon's top sits above the stat text baseline.
+static constexpr int WIFI_ICON_BASELINE_OFFSET = 6;
 
 // Nested-arcs Wi-Fi glyph, 7px wide x 6px tall, built from rectangle primitives
 // (the display driver exposes no per-pixel call, so 1x1 boxes stand in for pixels).
@@ -36,9 +42,7 @@ void Screen::showStartup(const char* message) {
     if (!driver) return;
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "RC Remote");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "RC Remote");
 
     driver->font(ScreenFont::Small);
     driver->text(0, 25, message);
@@ -51,9 +55,7 @@ void Screen::showConnectionEstablished() {
     if (!driver) return;
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "RC Remote");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "RC Remote");
 
     driver->font(ScreenFont::Small);
     driver->text(0, 25, "Car connected!");
@@ -62,41 +64,37 @@ void Screen::showConnectionEstablished() {
     driver->flush();
 }
 
-void Screen::showDashboard(const DashboardData& dashboard) {
-    ScreenDriver* driver = getScreenDriver();
-    if (!driver) return;
-
+// Car voltage left, remote voltage right; a low pack blinks its own reading out.
+static void drawBatteryRow(ScreenDriver* driver, const DashboardData& dashboard) {
     char buffer[32];
-    driver->clear();
-
-    // ── Battery row: car voltage left, remote voltage right ──────────────────
-    bool lowBatteryBlinkVisible = (millis() / LOW_BATTERY_BLINK_MS) % 2 == 0;
+    const bool blinkVisible = (millis() / LOW_BATTERY_BLINK_MS) % 2 == 0;
 
     driver->font(ScreenFont::Small);
     snprintf(buffer, sizeof(buffer), "CAR %.2fV", dashboard.carBatteryVoltage);
-    if (!dashboard.carBatteryLow || lowBatteryBlinkVisible) {
+    if (!dashboard.carBatteryLow || blinkVisible) {
         driver->text(0, 10, buffer);
     }
 
     snprintf(buffer, sizeof(buffer), "%.2fV RMT", dashboard.remoteBatteryVoltage);
-    if (!dashboard.remoteBatteryLow || lowBatteryBlinkVisible) {
+    if (!dashboard.remoteBatteryLow || blinkVisible) {
         driver->text(ScreenDriver::W - driver->textW(buffer), 10, buffer);
     }
 
     driver->hline(0, 14, ScreenDriver::W);
+}
 
-    // ── Link stat + menu hint share the row below the divider ────────────────
-    // The stat sits here rather than between the two voltages: at Small font the
-    // battery row already spans ~119 of 128px, leaving no room to centre anything
-    // between them without it colliding with a 2-digit voltage.
+// Link stat and menu hint share the row below the divider. The stat sits here
+// rather than between the two voltages: at Small font the battery row already
+// spans ~119 of 128px, leaving nothing to centre into without colliding with a
+// 2-digit voltage. In debug mode the one slot rotates latency / loss / jitter so
+// all three fit; the Wi-Fi icon only fronts latency, the others are labelled.
+static void drawLinkStatRow(ScreenDriver* driver, const DashboardData& dashboard) {
+    char buffer[32];
     driver->font(ScreenFont::Tiny);
+
     bool showWifiIcon = true;
-    // In debug mode the single indicator slot rotates between latency / loss /
-    // jitter so all three fit in one slot; otherwise it just shows latency. The
-    // Wi-Fi icon only fronts the latency reading — loss/jitter are their own
-    // labelled stats.
-    int statSlot = dashboard.debugMode
-        ? static_cast<int>((millis() / DASHBOARD_STAT_DWELL_MS) % 3)
+    const int statSlot = dashboard.debugMode
+        ? static_cast<int>((millis() / DASHBOARD_STAT_DWELL_MS) % DASHBOARD_STAT_SLOT_COUNT)
         : 0;
     if (statSlot == 1 && dashboard.lossPercent >= 0) {
         snprintf(buffer, sizeof(buffer), "L:%d%%", dashboard.lossPercent);
@@ -109,51 +107,63 @@ void Screen::showDashboard(const DashboardData& dashboard) {
     } else {
         snprintf(buffer, sizeof(buffer), "--");
     }
+
     const int statBaseline = 20;
     if (showWifiIcon) {
         const int iconWidth = 7;
         const int iconGap = 2;
-        const int iconTop = statBaseline - 6;
-        drawWifiIcon(driver, 0, iconTop);
+        drawWifiIcon(driver, 0, statBaseline - WIFI_ICON_BASELINE_OFFSET);
         driver->text(iconWidth + iconGap, statBaseline, buffer);
     } else {
         driver->text(0, statBaseline, buffer);
     }
 
     driver->text(ScreenDriver::W - driver->textW("STR:menu"), statBaseline, "STR:menu");
+}
 
-    // ── Speed ────────────────────────────────────────────────────────────────
+static void drawSpeedBlock(ScreenDriver* driver, const DashboardData& dashboard) {
+    char buffer[32];
+
     driver->font(ScreenFont::Large);
     snprintf(buffer, sizeof(buffer), "%.1f km/h", dashboard.speedKmh);
     driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 34, buffer);
 
-    // ── Max speed ─────────────────────────────────────────────────────────────
     driver->font(ScreenFont::Small);
     snprintf(buffer, sizeof(buffer), "MAX %.1f", dashboard.maxSpeedKmh);
     driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 44, buffer);
 
-    // ── RPM ───────────────────────────────────────────────────────────────────
     driver->font(ScreenFont::Medium);
     snprintf(buffer, sizeof(buffer), "%d RPM", dashboard.speedRpm);
     driver->text((ScreenDriver::W - driver->textW(buffer)) / 2, 57, buffer);
+}
 
-    // ── Debug badge — bottom-left, in the 6px band below the RPM row ────────────
+// Both badges share the 6px band below the RPM row — debug left, low battery
+// right. The low-battery label is kept short so it clears the DEBUG MODE badge
+// (both are Tiny; the long form spanned 68 of the 128px width).
+static void drawStatusBadges(ScreenDriver* driver, const DashboardData& dashboard) {
     if (dashboard.debugMode) {
         driver->font(ScreenFont::Tiny);
         driver->text(0, ScreenDriver::H - 1, "DEBUG MODE");
     }
 
-    // ── Low-battery badge — bottom-right, shares the band with the debug badge ──
     if (dashboard.carBatteryLow || dashboard.remoteBatteryLow) {
         driver->font(ScreenFont::Tiny);
-        // Kept short so it clears the DEBUG MODE badge sharing this row (both are
-        // Tiny; the long form spanned 68 of the 128px width).
         const char* lowBatteryLabel = dashboard.carBatteryLow && dashboard.remoteBatteryLow
             ? "LOW:CAR+RMT"
             : (dashboard.carBatteryLow ? "LOW:CAR" : "LOW:RMT");
         driver->text(ScreenDriver::W - driver->textW(lowBatteryLabel), ScreenDriver::H - 1, lowBatteryLabel);
     }
+}
 
+void Screen::showDashboard(const DashboardData& dashboard) {
+    ScreenDriver* driver = getScreenDriver();
+    if (!driver) return;
+
+    driver->clear();
+    drawBatteryRow(driver, dashboard);
+    drawLinkStatRow(driver, dashboard);
+    drawSpeedBlock(driver, dashboard);
+    drawStatusBadges(driver, dashboard);
     driver->flush();
 }
 

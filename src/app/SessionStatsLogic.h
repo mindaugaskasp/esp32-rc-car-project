@@ -14,7 +14,7 @@ struct SessionStats {
 };
 
 // One millisecond in hours — km/h * hours = km, and distance / hours = km/h.
-static const float MILLIS_PER_HOUR = 3600000.0f;
+static constexpr float MILLIS_PER_HOUR = 3600000.0f;
 
 // Fold one time slice into the running stats: advance elapsed time by sliceMs and
 // add the distance covered at speedKmh over that slice, then recompute the average.
@@ -30,7 +30,7 @@ inline void accumulateSession(SessionStats& stats, float speedKmh, uint32_t slic
 
 // Ring buffer of recent speed samples for the speed-over-time graph. One slot per
 // plottable column of the 128px display; once full it scrolls (oldest overwritten).
-static const int SPEED_HISTORY_CAPACITY = 128;
+static constexpr int SPEED_HISTORY_CAPACITY = 128;
 
 struct SpeedHistory {
     float samples[SPEED_HISTORY_CAPACITY] = {};

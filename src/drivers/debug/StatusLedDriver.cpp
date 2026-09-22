@@ -4,7 +4,7 @@
 
 // Low duty on purpose: the WS2812 at full white is bright and a needless current
 // draw for a status blink. 40/255 is clearly visible without either downside.
-static const uint8_t STATUS_LED_LEVEL = 40;
+static constexpr uint8_t STATUS_LED_LEVEL = 40;
 
 static StatusColor blinkColor = StatusColor::Off;
 static uint16_t blinkPeriodMs = 0;  // 0 = solid (no blink)

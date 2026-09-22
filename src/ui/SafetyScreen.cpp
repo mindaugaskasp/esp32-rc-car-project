@@ -1,5 +1,6 @@
 #include "SafetyScreen.h"
 #include "drivers/display/ScreenDriver.h"
+#include "ui/ScreenUtils.h"
 
 SafetyScreen safetyScreen;
 
@@ -8,9 +9,7 @@ void SafetyScreen::show() {
     if (!driver) return;
 
     driver->clear();
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "SAFETY STOP");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "SAFETY STOP");
 
     driver->font(ScreenFont::Large);
     driver->text(12, 37, "MOTOR STOPPED");

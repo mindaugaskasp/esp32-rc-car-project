@@ -40,8 +40,8 @@ static void recoverI2cBus() {
     pinMode(SCREEN_SDA_PIN, INPUT);
 }
 
-static const uint8_t OLED_ADDRESS_PRIMARY = 0x3C;
-static const uint8_t OLED_ADDRESS_ALTERNATE = 0x3D;
+static constexpr uint8_t OLED_ADDRESS_PRIMARY = 0x3C;
+static constexpr uint8_t OLED_ADDRESS_ALTERNATE = 0x3D;
 
 static bool i2cDeviceResponds(uint8_t sevenBitAddress) {
     Wire.beginTransmission(sevenBitAddress);

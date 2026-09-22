@@ -14,8 +14,8 @@ static ScreenFont scaledFontTier(ScreenFont requested) {
     return static_cast<ScreenFont>(tier);
 }
 
-static const uint8_t* toU8g2Font(ScreenFont f) {
-    switch (scaledFontTier(f)) {
+static const uint8_t* toU8g2Font(ScreenFont fontChoice) {
+    switch (scaledFontTier(fontChoice)) {
         case ScreenFont::Tiny: return u8g2_font_4x6_tf;
         case ScreenFont::Small: return u8g2_font_5x7_tf;
         case ScreenFont::Medium: return u8g2_font_6x10_tf;
@@ -42,8 +42,8 @@ void U8g2ScreenDriver::flush() {
     display.sendBuffer();
 }
 
-void U8g2ScreenDriver::font(ScreenFont f) {
-    display.setFont(toU8g2Font(f));
+void U8g2ScreenDriver::font(ScreenFont fontChoice) {
+    display.setFont(toU8g2Font(fontChoice));
 }
 
 void U8g2ScreenDriver::text(int x, int y, const char* content) {

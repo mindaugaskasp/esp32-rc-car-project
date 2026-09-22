@@ -8,31 +8,31 @@
 // Joystick ADC inputs — ADC1 channels. Left stick drives throttle (Y, also menu
 // up/down navigation), right stick drives steering (X). Each stick's axis + button
 // sit on adjacent header pins: throttle on GPIO4/5, steering on GPIO9/10.
-const int THROTTLE_Y_PIN = 4; // ADC1_CH3 — left stick, throttle
-const int STEERING_X_PIN = 9; // ADC1_CH8 — right stick, steering
+constexpr int THROTTLE_Y_PIN = 4; // ADC1_CH3 — left stick, throttle
+constexpr int STEERING_X_PIN = 9; // ADC1_CH8 — right stick, steering
 
 // Joystick push-button switches (active LOW, INPUT_PULLUP). Navigation convention:
 // STEERING_SW enters/selects/advances (goes deeper), THROTTLE_SW exits/backs out.
-const int THROTTLE_SW_PIN = 5; // left stick (throttle) button — exit / back / cancel
-const int STEERING_SW_PIN = 10; // right stick (steering) button — enter / select / advance
+constexpr int THROTTLE_SW_PIN = 5; // left stick (throttle) button — exit / back / cancel
+constexpr int STEERING_SW_PIN = 10; // right stick (steering) button — enter / select / advance
 
 // Physical DEBUG-mode toggle switch (active LOW, INPUT_PULLUP): wire one leg to
 // this pin and the other to GND. While ON it reveals the Debug Info menu entry,
 // the dashboard DEBUG MODE badge, and the rotating link-stat readout. GPIO15 is a
 // free, non-strapping pin; change it here if you wired the switch elsewhere.
-const int DEBUG_MODE_SWITCH_PIN = 15;
+constexpr int DEBUG_MODE_SWITCH_PIN = 15;
 
 // Battery voltage sense — remote battery + through a divider module (values in
 // BatteryConfig.h), never directly. GPIO1 is on ADC1 (usable while WiFi/ESP-NOW
 // is active). The receiver keeps its own sense pin; only the divider math is shared.
-const int BATTERY_SENSE_PIN = 1;
+constexpr int BATTERY_SENSE_PIN = 1;
 
 // I2C pins for the OLED screen — remappable via the GPIO matrix; kept adjacent.
-const int SCREEN_SDA_PIN = 17;
-const int SCREEN_SCL_PIN = 18;
+constexpr int SCREEN_SDA_PIN = 17;
+constexpr int SCREEN_SCL_PIN = 18;
 
 // Onboard WS2812 status LED (diagnostic indicator, see StatusLedDriver). GPIO38 on
 // this Waveshare board (the ESP32-S3-DevKitC-1 default is 48); if a future board
 // never lights, its WS2812 is wired elsewhere — try 48 or 21.
-const int STATUS_LED_PIN = 38;
+constexpr int STATUS_LED_PIN = 38;
   

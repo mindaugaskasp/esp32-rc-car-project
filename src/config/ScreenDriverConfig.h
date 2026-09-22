@@ -23,4 +23,4 @@
 //  -1  = one tier smaller everywhere (denser — good for the 2.42" SSD1309)
 //  +1  = one tier larger everywhere
 // Layout coordinates are unaffected (text width is measured post-scale).
-constexpr int SCREEN_FONT_SCALE_OFFSET = 0;
+constexpr int SCREEN_FONT_SCALE_OFFSET = -1;

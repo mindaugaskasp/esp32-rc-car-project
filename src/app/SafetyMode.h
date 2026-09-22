@@ -14,7 +14,7 @@ public:
     bool wantsExit();
 
 private:
-    static const unsigned long SEND_INTERVAL_MS = 20; // ~50Hz neutral hold
+    static constexpr unsigned long SEND_INTERVAL_MS = 20; // ~50Hz neutral hold
     bool _throttleSwWas = false;
     unsigned long _lastSendTime = 0;
     bool _wantsExit = false;

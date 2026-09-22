@@ -8,7 +8,7 @@
 // command -> PWM endpoint map. All math is integer per-mille.
 
 // Denominator for the per-mille expo/rate parameters: 1000 == full scale.
-static const int RESPONSE_FULL_SCALE = 1000;
+static constexpr int RESPONSE_FULL_SCALE = 1000;
 
 // Shapes a raw deflection magnitude (0..span) with an expo curve and a rate cap,
 // returning a magnitude in the same raw units (0..span).

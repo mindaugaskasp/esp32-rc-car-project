@@ -28,10 +28,10 @@ private:
     unsigned long _yUpStart = 0;
     unsigned long _yDownStart = 0;
 
-    static const int STEP_RAW = 10;
-    static const int MAX_OFFSET = 400;
-    static const unsigned long TAP_MAX_MS = 700;
-    static const unsigned long HOLD_MS = 1000;
+    static constexpr int STEP_RAW = 10;
+    static constexpr int MAX_OFFSET = 400;
+    static constexpr unsigned long TAP_MAX_MS = 700;
+    static constexpr unsigned long HOLD_MS = 1000;
 
     int trimDeltaMicros() const;
     int rawToMicros(int rawX) const;

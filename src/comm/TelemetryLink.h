@@ -42,8 +42,8 @@ public:
     void handleReceive(const uint8_t* mac, const uint8_t* incomingData, int len);
 
 private:
-    static const int RTT_ACCUM_MIN_RESET = 1000000;
-    static const int RTT_ACCUM_MAX_RESET = -1;
+    static constexpr int RTT_ACCUM_MIN_RESET = 1000000;
+    static constexpr int RTT_ACCUM_MAX_RESET = -1;
 
     portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
     TelemetryData _pending = {};

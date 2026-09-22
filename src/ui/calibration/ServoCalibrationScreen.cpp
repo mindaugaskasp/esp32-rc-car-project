@@ -6,8 +6,8 @@
 #include "config/controller/Esp32Pins.h"
 #include <Arduino.h>
 
-static const int CENTER_US = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;
-static const int HALF_RANGE =
+static constexpr int CENTER_US = SERVO_CENTER_MICROS;
+static constexpr int HALF_RANGE =
     (CENTER_US - SERVO_MIN_MICROS < SERVO_MAX_MICROS - CENTER_US)
     ? (CENTER_US - SERVO_MIN_MICROS) : (SERVO_MAX_MICROS - CENTER_US);
 

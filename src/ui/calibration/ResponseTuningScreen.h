@@ -36,13 +36,13 @@ private:
     unsigned long _steeringSwDownAt = 0;
     unsigned long _lastAdjustMs = 0;
 
-    static const int DEADZONE_MIN = 0;
-    static const int DEADZONE_MAX = 400;
-    static const int DEADZONE_STEP = 2;
-    static const int CURVE_STEP = 10; // expo/rate step per adjust tick (per-mille)
-    static const int ADJUST_THRESHOLD_RAW = 800; // free-stick deflection to start adjusting
-    static const unsigned long ADJUST_INTERVAL_MS = 40; // repeat cadence while held
-    static const unsigned long CONFIRM_HOLD_MS = 1200;
+    static constexpr int DEADZONE_MIN = 0;
+    static constexpr int DEADZONE_MAX = 400;
+    static constexpr int DEADZONE_STEP = 2;
+    static constexpr int CURVE_STEP = 10; // expo/rate step per adjust tick (per-mille)
+    static constexpr int ADJUST_THRESHOLD_RAW = 800; // free-stick deflection to start adjusting
+    static constexpr unsigned long ADJUST_INTERVAL_MS = 40; // repeat cadence while held
+    static constexpr unsigned long CONFIRM_HOLD_MS = 1200;
 
     int driveAxisRaw(int rawX, int rawY) const;
     int adjustAxisRaw(int rawX, int rawY) const;

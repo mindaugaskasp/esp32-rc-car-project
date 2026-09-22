@@ -1,5 +1,6 @@
 #include "LinkModeScreen.h"
 #include "drivers/display/ScreenDriver.h"
+#include "ui/ScreenUtils.h"
 
 LinkModeScreen linkModeScreen;
 
@@ -8,9 +9,7 @@ void LinkModeScreen::show(LinkPhyMode applied, bool switching) {
     if (!driver) return;
 
     driver->clear();
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "LINK MODE");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "LINK MODE");
 
     driver->font(ScreenFont::Large);
     driver->text(4, 37, applied == LinkPhyMode::LongRange ? "LONG RANGE" : "STANDARD");

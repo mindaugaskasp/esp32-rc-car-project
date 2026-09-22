@@ -26,6 +26,12 @@
 // for an even slower feed while eyeballing wiring/calibration values.
 #define DEBUG_LOG_MIN_INTERVAL_MS 0
 
+// Forces the transmitter's runtime DEBUG mode on without the physical switch on
+// DEBUG_MODE_SWITCH_PIN, for bench work on a board where that switch is not wired.
+// The switch still turns it on; this only removes the requirement. Set false to put
+// the switch back in sole control.
+#define DEBUG_MODE_FORCE_ON true
+
 // Dwell time per rotating dashboard link-stat (latency / loss / jitter) shown in
 // the battery row while the transmitter's physical DEBUG switch is ON (see
 // DEBUG_MODE_SWITCH_PIN in config/controller/Esp32PinsTransmitter.h).

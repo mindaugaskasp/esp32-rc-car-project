@@ -2,15 +2,15 @@
 #include "config/ControlConfig.h"
 
 // ESC PWM pulse width constants (microseconds)
-static const int ESC_MIN_MICROS = 1100;
-static const int ESC_NEUTRAL_MICROS = 1500;
-static const int ESC_MAX_MICROS = 1900;
+static constexpr int ESC_MIN_MICROS = 1100;
+static constexpr int ESC_NEUTRAL_MICROS = 1500;
+static constexpr int ESC_MAX_MICROS = 1900;
 
 // Servo-library attach() bounds. Deliberately wider than the operational
 // ESC_MIN/MAX range so the driver can command the full standard 1000-2000µs span
 // during ESC arming/programming without the library clamping it to the run range.
-static const int ESC_ATTACH_MIN_MICROS = 1000;
-static const int ESC_ATTACH_MAX_MICROS = 2000;
+static constexpr int ESC_ATTACH_MIN_MICROS = 1000;
+static constexpr int ESC_ATTACH_MAX_MICROS = 2000;
 
 // ESC PWM pulse width (µs) for a conditioned throttle command. The transmitter has
 // already removed the deadzone and applied the expo/rate curve, so this is a pure

@@ -24,7 +24,7 @@ public:
     virtual void flush() = 0;
 
     // Text — set font before calling textW() for accurate measurement.
-    virtual void font(ScreenFont f) = 0;
+    virtual void font(ScreenFont fontChoice) = 0;
     virtual void text(int x, int y, const char* content) = 0;
     virtual void scrollText(int y, const char* content) = 0; // marquee if too wide
     virtual int textW(const char* content) = 0;
@@ -35,8 +35,8 @@ public:
     virtual void box(int x, int y, int w, int h) = 0;
     virtual void frame(int x, int y, int w, int h) = 0;
 
-    static const int W = 128;
-    static const int H = 64;
+    static constexpr int W = 128;
+    static constexpr int H = 64;
 };
 
 ScreenDriver* getScreenDriver();

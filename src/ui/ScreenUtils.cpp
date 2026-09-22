@@ -4,6 +4,17 @@
 #include <stdio.h>
 #include <string.h>
 
+// Baselines shared by every screen header so the title and its underline stay
+// locked together; changing one here moves all screens at once.
+static constexpr int SCREEN_HEADER_TITLE_BASELINE = 10;
+static constexpr int SCREEN_HEADER_RULE_Y = 13;
+
+void drawScreenHeader(ScreenDriver& driver, const char* title) {
+    driver.font(ScreenFont::Medium);
+    driver.text(0, SCREEN_HEADER_TITLE_BASELINE, title);
+    driver.hline(0, SCREEN_HEADER_RULE_Y, ScreenDriver::W);
+}
+
 void drawCalibrationStep(ScreenDriver& driver, const char* title, uint8_t step,
                    uint8_t totalSteps, const char* instruction, int barValue) {
     driver.clear();

@@ -15,7 +15,7 @@ public:
     bool wantsExit();
 
 private:
-    static const unsigned long SEND_INTERVAL_MS = 20; // keep the link warm for snappy negotiation
+    static constexpr unsigned long SEND_INTERVAL_MS = 20; // keep the link warm for snappy negotiation
 
     void redrawIfChanged(bool force);
 

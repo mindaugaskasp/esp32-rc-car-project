@@ -14,7 +14,7 @@
 
 // Status LED: white while booting, green blink once running but with no transmitter
 // linked, blue blink once commands are flowing. See docs/status-led.md.
-static const uint16_t STATUS_BLINK_PERIOD_MS = 250;
+static constexpr uint16_t STATUS_BLINK_PERIOD_MS = 250;
 
 void setup() {
     Serial.begin(BAUD_RATE);

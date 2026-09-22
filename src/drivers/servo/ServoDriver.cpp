@@ -5,7 +5,12 @@
 
 static Servo servo;
 
-static int currentServoMicros = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;
+static int currentServoMicros = SERVO_CENTER_MICROS;
+
+// Clamped so a travel limit tightened below the nominal offset still wins: the
+// wiggle must never drive the linkage into its stops.
+static constexpr int TWITCH_OFFSET_MICROS = SERVO_TWITCH_OFFSET_MICROS < SERVO_MAX_TRAVEL_MICROS
+    ? SERVO_TWITCH_OFFSET_MICROS : SERVO_MAX_TRAVEL_MICROS;
 
 void initServo() {
     servo.attach(SERVO_PIN, SERVO_MIN_MICROS, SERVO_MAX_MICROS);
@@ -20,11 +25,11 @@ void setServoAngle(int rawX) {
 }
 
 void twitchServo() {
-    const int centerMicros = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;
+    const int centerMicros = SERVO_CENTER_MICROS;
     for (int sweep = 0; sweep < SERVO_TWITCH_COUNT; sweep++) {
-        servo.writeMicroseconds(centerMicros + SERVO_TWITCH_OFFSET_MICROS);
+        servo.writeMicroseconds(centerMicros + TWITCH_OFFSET_MICROS);
         delay(SERVO_TWITCH_HOLD_MS);
-        servo.writeMicroseconds(centerMicros - SERVO_TWITCH_OFFSET_MICROS);
+        servo.writeMicroseconds(centerMicros - TWITCH_OFFSET_MICROS);
         delay(SERVO_TWITCH_HOLD_MS);
     }
     servo.writeMicroseconds(centerMicros);

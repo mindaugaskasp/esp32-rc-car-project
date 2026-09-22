@@ -6,12 +6,12 @@
 #include <drivers/debug/DebugLogger.h>
 #include <drivers/debug/StatusLedDriver.h>
 
-static const uint8_t ADVERTISEMENT_MAGIC = 0xCA;
-static const uint8_t BROADCAST_MAC[MAC_ADDRESS_LENGTH] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static constexpr uint8_t ADVERTISEMENT_MAGIC = 0xCA;
+static constexpr uint8_t BROADCAST_MAC[MAC_ADDRESS_LENGTH] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 // While camping on the rendezvous channel for the transmitter, re-log at this
 // cadence so the serial console shows the receiver is alive and still waiting.
-static const unsigned long WAITING_LOG_INTERVAL_MS = 2000;
+static constexpr unsigned long WAITING_LOG_INTERVAL_MS = 2000;
 
 struct ChannelAdvertisementPacket {
     uint8_t magic;
