@@ -11,13 +11,13 @@
 // Number of consecutive near-neutral throttle commands required to arm.
 // Keep small — the transmitter's idle heartbeat sends neutral frames every 300ms,
 // so arming costs well under a second once the stick is centered.
-static const int ARM_COMMAND_THRESHOLD = 2;
+static constexpr int ARM_COMMAND_THRESHOLD = 2;
 
 // How far (in conditioned ADC units) a throttle command may sit from
 // THROTTLE_CENTER_RAW and still count as neutral for arming. The transmitter
 // snaps in-deadzone sticks exactly to center, so this only needs to tolerate a
 // barely-deflected stick; 100 units ≈ 20µs of ESC pulse — no meaningful motion.
-static const int ARM_NEUTRAL_THROTTLE_BAND = 100;
+static constexpr int ARM_NEUTRAL_THROTTLE_BAND = 100;
 
 inline bool isNeutralThrottleCommand(int throttleCommand) {
     int deflection = throttleCommand - THROTTLE_CENTER_RAW;

@@ -2,6 +2,7 @@
 #include "drivers/display/ScreenDriver.h"
 #include <Arduino.h>
 #include <stdio.h>
+#include "ui/ScreenUtils.h"
 
 WifiPingScreen wifiPingScreen;
 
@@ -12,9 +13,7 @@ void WifiPingScreen::show(const PingStats& stats) {
     char buffer[32];
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "WIFI PING");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "WIFI PING");
 
     driver->font(ScreenFont::Small);
 

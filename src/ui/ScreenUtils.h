@@ -3,8 +3,13 @@
 #include "drivers/display/ScreenDriver.h"
 #include <stdint.h>
 
-// Shared rendering helpers for calibration screens.
-// All functions clear the buffer, draw, and flush.
+// Shared rendering helpers for the transmitter's screens.
+// The drawCalibration* functions clear the buffer, draw, and flush.
+
+// Standard screen header: title in Medium font over a full-width rule. Does NOT
+// clear or flush, and leaves the font at Medium — call inside an existing
+// clear/flush pair and set the body font afterwards.
+void drawScreenHeader(ScreenDriver& driver, const char* title);
 
 void drawCalibrationStep(ScreenDriver& driver, const char* title, uint8_t step,
                    uint8_t totalSteps, const char* instruction, int barValue);

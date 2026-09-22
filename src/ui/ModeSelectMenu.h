@@ -37,7 +37,7 @@ public:
     void setCursor(int8_t cursor) { _cursor = cursor; }
 
 private:
-    static const unsigned long MS_TAP_MAX_MS = 700;
+    static constexpr unsigned long MS_TAP_MAX_MS = 700;
 
     const char* const* _names = nullptr; // caller-owned row labels
     int8_t _count = 0;

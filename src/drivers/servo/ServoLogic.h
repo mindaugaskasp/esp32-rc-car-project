@@ -1,7 +1,7 @@
 #pragma once
 #include "config/ControlConfig.h"
 
-static const int SERVO_STEERING_CENTER_RAW = STEERING_CENTER_RAW;
+static constexpr int SERVO_STEERING_CENTER_RAW = STEERING_CENTER_RAW;
 
 // Servo PWM pulse width (µs) for a conditioned steering command. The transmitter has
 // already removed the deadzone and applied the expo/rate curve, so this is a pure
@@ -11,7 +11,7 @@ inline int computeServoMicros(int command) {
     if (command < 0) command = 0;
     if (command > 4095) command = 4095;
 
-    const int center = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS;
+    const int center = SERVO_CENTER_MICROS;
 
     int targetMicros = center;
     if (command < SERVO_STEERING_CENTER_RAW) {

@@ -24,10 +24,10 @@ private:
     int8_t _cursor = 0;
     int8_t _active = -1;
 
-    static const int8_t ITEM_COUNT = 4;
+    static constexpr int8_t ITEM_COUNT = 4;
     static const char* const ITEM_NAMES[ITEM_COUNT];
-    static const unsigned long SELECT_MS = 1500;
-    static const unsigned long TAP_MAX_MS = 700;
+    static constexpr unsigned long SELECT_MS = 1500;
+    static constexpr unsigned long TAP_MAX_MS = 700;
 
     JoystickCalibrationScreen _joystick;
     ServoCalibrationScreen _servoAlign;

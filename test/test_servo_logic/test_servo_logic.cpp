@@ -3,10 +3,9 @@
 
 // Assertions reference the config symbols directly (SERVO_STEERING_CENTER_RAW,
 // STEERING_JOY_MIN/MAX, SERVO_MIN/MAX_MICROS), so they hold regardless of the tuned
-// values. The only literal below is the trimmed center:
-//   center = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS (1500 + 80 = 1580).
+// values — including the steering-travel limit, which moves both endpoints.
 
-static const int CENTER = SERVO_NEUTRAL_MICROS + SERVO_CENTER_TRIM_MICROS; // 1580
+static const int CENTER = SERVO_CENTER_MICROS;
 
 void setUp() {}
 void tearDown() {}
@@ -28,12 +27,10 @@ void test_just_left_of_center_below_center() {
 // --- Calibrated endpoints ---
 
 void test_full_right_returns_servo_max() {
-    // map(3950, 2048, 3950, 1580, 2500): (3950-2048)*920/1902 + 1580 = 920 + 1580 = 2500
     TEST_ASSERT_EQUAL(SERVO_MAX_MICROS, computeServoMicros(STEERING_JOY_MAX));
 }
 
 void test_full_left_returns_servo_min() {
-    // map(100, 100, 2048, 500, 1580): (100-100)*1080/1948 + 500 = 0 + 500 = 500
     TEST_ASSERT_EQUAL(SERVO_MIN_MICROS, computeServoMicros(STEERING_JOY_MIN));
 }
 

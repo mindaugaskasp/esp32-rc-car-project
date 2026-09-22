@@ -2,11 +2,12 @@
 #include "drivers/display/ScreenDriver.h"
 #include <Arduino.h>
 #include <stdio.h>
+#include "ui/ScreenUtils.h"
 
 WifiScanScreen wifiScanScreen;
 
-static const char SPINNER_CHARS[] = { '|', '/', '-', '\\' };
-static const uint8_t SPINNER_COUNT = sizeof(SPINNER_CHARS);
+static constexpr char SPINNER_CHARS[] = { '|', '/', '-', '\\' };
+static constexpr uint8_t SPINNER_COUNT = sizeof(SPINNER_CHARS);
 
 void WifiScanScreen::showScanning() {
     ScreenDriver* driver = getScreenDriver();
@@ -15,9 +16,7 @@ void WifiScanScreen::showScanning() {
     char buffer[32];
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "WIFI ANALYSIS");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "WIFI ANALYSIS");
 
     driver->font(ScreenFont::Small);
     driver->text(0, 28, "Scanning 2.4GHz...");
@@ -39,9 +38,7 @@ void WifiScanScreen::showResult(const ChannelScanResult& result, int countdownSe
     char buffer[32];
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "WIFI ANALYSIS");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "WIFI ANALYSIS");
 
     driver->font(ScreenFont::Small);
 

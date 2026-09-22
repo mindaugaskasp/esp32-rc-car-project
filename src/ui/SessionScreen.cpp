@@ -1,13 +1,14 @@
 #include "SessionScreen.h"
 #include "drivers/display/ScreenDriver.h"
 #include <stdio.h>
+#include "ui/ScreenUtils.h"
 
 SessionScreen sessionScreen;
 
 // Graph plot region (below the title rule, above the footer hint).
-static const int GRAPH_TOP = 16;
-static const int GRAPH_BASELINE = 54;
-static const int GRAPH_HEIGHT = GRAPH_BASELINE - GRAPH_TOP;
+static constexpr int GRAPH_TOP = 16;
+static constexpr int GRAPH_BASELINE = 54;
+static constexpr int GRAPH_HEIGHT = GRAPH_BASELINE - GRAPH_TOP;
 
 // Formats elapsed milliseconds as H:MM:SS (hours dropped once below an hour).
 static void formatElapsed(uint32_t elapsedMs, char* out, int outSize) {
@@ -31,9 +32,7 @@ void SessionScreen::showStats(const SessionStats& stats) {
     char buffer[32];
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "SESSION");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "SESSION");
 
     driver->font(ScreenFont::Small);
 
@@ -65,9 +64,7 @@ void SessionScreen::showGraph(const SpeedHistory& history, float maxSpeedKmh) {
     char buffer[24];
     driver->clear();
 
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "SPEED km/h");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "SPEED km/h");
 
     driver->hline(0, GRAPH_BASELINE, ScreenDriver::W);
 

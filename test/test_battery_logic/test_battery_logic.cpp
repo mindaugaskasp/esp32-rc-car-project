@@ -7,8 +7,9 @@ void tearDown() {}
 // --- Divider scaling (module is 30k/7.5k → ×5) ---
 
 void test_divider_scales_by_module_ratio() {
-    TEST_ASSERT_EQUAL(7400, batteryMillivoltsFromAdc(1480, BATTERY_DIVIDER_TOP_OHMS, BATTERY_DIVIDER_BOTTOM_OHMS));
-    TEST_ASSERT_EQUAL(8400, batteryMillivoltsFromAdc(1680, BATTERY_DIVIDER_TOP_OHMS, BATTERY_DIVIDER_BOTTOM_OHMS));
+    // Literal 5x divider (40k/10k), so rewiring the real resistors cannot fail this.
+    TEST_ASSERT_EQUAL(7400, batteryMillivoltsFromAdc(1480, 40000, 10000));
+    TEST_ASSERT_EQUAL(8400, batteryMillivoltsFromAdc(1680, 40000, 10000));
 }
 
 void test_zero_input_reads_zero() {
@@ -43,7 +44,7 @@ void test_invalid_calibration_reads_zero() {
 // --- EMA smoothing ---
 
 void test_first_sample_primes_filter() {
-    TEST_ASSERT_EQUAL(7400, smoothBatteryMillivolts(-1, 7400, BATTERY_SMOOTHING_NUM, BATTERY_SMOOTHING_DEN));
+    TEST_ASSERT_EQUAL(7400, smoothBatteryMillivolts(-1, 7400, 1, 4));
 }
 
 void test_smoothing_moves_fractionally_toward_sample() {

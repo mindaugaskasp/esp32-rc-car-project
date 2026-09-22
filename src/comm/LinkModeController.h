@@ -39,12 +39,12 @@ public:
 private:
     // Revert an unconfirmed fresh switch this fast (a lost ack); tolerate this much
     // silence on a confirmed Long Range link before falling back to Standard.
-    static const unsigned long CONFIRM_TIMEOUT_MS = 1000;
-    static const unsigned long LINK_DEAD_REVERT_MS = 4000;
+    static constexpr unsigned long CONFIRM_TIMEOUT_MS = 1000;
+    static constexpr unsigned long LINK_DEAD_REVERT_MS = 4000;
     // Give up a request the receiver never acked while the link is still alive.
-    static const unsigned long REQUEST_GIVE_UP_MS = 3000;
+    static constexpr unsigned long REQUEST_GIVE_UP_MS = 3000;
     // No telemetry for this long counts as "link not alive" for the give-up rule.
-    static const unsigned long LINK_ALIVE_WINDOW_MS = 500;
+    static constexpr unsigned long LINK_ALIVE_WINDOW_MS = 500;
 
     void setDesired(LinkPhyMode mode, unsigned long now);
 

@@ -22,9 +22,9 @@ private:
     void showSyncWarning();
     void updateLinkStats(bool newTelemetry);
 
-    static const unsigned long CONNECTION_MESSAGE_MS = 3000;
-    static const unsigned long NO_CONNECTION_TIMEOUT_MS = 15000;
-    static const unsigned long LOSS_WINDOW_MS = 5000; // recompute loss% over this rolling window
+    static constexpr unsigned long CONNECTION_MESSAGE_MS = 3000;
+    static constexpr unsigned long NO_CONNECTION_TIMEOUT_MS = 15000;
+    static constexpr unsigned long LOSS_WINDOW_MS = 5000; // recompute loss% over this rolling window
 
     bool _connectionEstablished = false;
     unsigned long _connectionEstablishedAt = 0;

@@ -6,8 +6,8 @@
 #include "config/controller/Esp32Pins.h"
 #include <Arduino.h>
 
-static const unsigned long RELEASE_MS = 2000;
-static const unsigned long CENTER_MS = 1500;
+static constexpr unsigned long RELEASE_MS = 2000;
+static constexpr unsigned long CENTER_MS = 1500;
 
 void JoystickCalibrationScreen::begin() {
     _state = State::Release;

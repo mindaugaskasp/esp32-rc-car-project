@@ -4,32 +4,43 @@
 void setUp() {}
 void tearDown() {}
 
+// THROTTLE_INVERT mirrors computeEscMicros() around neutral. The mirror is its own
+// inverse, so undoing it here lets the assertions below pin the underlying mapping
+// rather than whichever orientation the config is currently set to.
+static int canonical(int micros) {
+#if THROTTLE_INVERT
+    return ESC_MIN_MICROS + ESC_MAX_MICROS - micros;
+#else
+    return micros;
+#endif
+}
+
 // --- Endpoints ---
 
 void test_full_brake_returns_min() {
-    TEST_ASSERT_EQUAL(ESC_MIN_MICROS, computeEscMicros(THROTTLE_JOY_MIN));
+    TEST_ASSERT_EQUAL(ESC_MIN_MICROS, canonical(computeEscMicros(THROTTLE_JOY_MIN)));
 }
 
 void test_full_throttle_returns_max() {
-    TEST_ASSERT_EQUAL(ESC_MAX_MICROS, computeEscMicros(THROTTLE_JOY_MAX));
+    TEST_ASSERT_EQUAL(ESC_MAX_MICROS, canonical(computeEscMicros(THROTTLE_JOY_MAX)));
 }
 
 // --- Center reads neutral (deadzone is now removed transmitter-side) ---
 
 void test_center_is_neutral() {
-    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW));
+    TEST_ASSERT_EQUAL(ESC_NEUTRAL_MICROS, canonical(computeEscMicros(THROTTLE_CENTER_RAW)));
 }
 
 // --- Bidirectional mapping: below-center is reverse, above-center is forward ---
 
 void test_below_center_is_reverse() {
-    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW - 1));
-    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(500));
+    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, canonical(computeEscMicros(THROTTLE_CENTER_RAW - 1)));
+    TEST_ASSERT_LESS_THAN(ESC_NEUTRAL_MICROS, canonical(computeEscMicros(500)));
 }
 
 void test_above_center_is_forward() {
-    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(THROTTLE_CENTER_RAW + 50));
-    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, computeEscMicros(3500));
+    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, canonical(computeEscMicros(THROTTLE_CENTER_RAW + 50)));
+    TEST_ASSERT_GREATER_THAN(ESC_NEUTRAL_MICROS, canonical(computeEscMicros(3500)));
 }
 
 // --- Clamping ---
@@ -60,11 +71,11 @@ static int expectedAboveCenter(int rawY) {
 }
 
 void test_known_value_below_center() {
-    TEST_ASSERT_EQUAL(expectedBelowCenter(1000), computeEscMicros(1000));
+    TEST_ASSERT_EQUAL(expectedBelowCenter(1000), canonical(computeEscMicros(1000)));
 }
 
 void test_known_value_above_center() {
-    TEST_ASSERT_EQUAL(expectedAboveCenter(3000), computeEscMicros(3000));
+    TEST_ASSERT_EQUAL(expectedAboveCenter(3000), canonical(computeEscMicros(3000)));
 }
 
 // --- Output always in valid PWM range ---

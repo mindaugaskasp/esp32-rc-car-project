@@ -26,19 +26,30 @@ private:
         int len;
     };
 
-    static const unsigned long PACKET_LOSS_TIMEOUT_MS = 500;
+    static constexpr unsigned long PACKET_LOSS_TIMEOUT_MS = 500;
 
     // Channel resync: if the link stays down this long, the transmitter has
     // likely restarted and may have moved to a new WiFi channel. We then hop to
     // the advertisement channel to listen for a fresh channel advertisement,
     // alternating with the operational channel so we also catch a transmitter
     // that resumes on the same channel.
-    static const unsigned long RESYNC_AFTER_LOSS_MS = 3000;
-    static const unsigned long RESYNC_LISTEN_MS = 1500; // time spent on the advertisement channel per cycle
-    static const unsigned long RESYNC_SERVE_MS = 1500;  // time back on the operational channel per cycle
+    static constexpr unsigned long RESYNC_AFTER_LOSS_MS = 3000;
+    static constexpr unsigned long RESYNC_LISTEN_MS = 1500; // time spent on the advertisement channel per cycle
+    static constexpr unsigned long RESYNC_SERVE_MS = 1500;  // time back on the operational channel per cycle
 
     void dispatch(const uint8_t* mac, const VehicleData& data);
     void updateResync(unsigned long now);
+    void consumePendingPacket();
+    bool stashChannelAdvertisement(const uint8_t* mac, const uint8_t* incomingData, int len);
+    void bufferPendingCommand(const uint8_t* mac, const uint8_t* incomingData, int len);
+    void signalLinkEstablished();
+    void applyControlOutputs(const VehicleData& data);
+    void sendTelemetryAck(const uint8_t* mac, const VehicleData& data, LinkPhyMode ackLinkMode);
+    // True when a fresh advertisement moved us to a new channel; the caller then
+    // skips the rest of the cycle, leaving the ESC neutral until a real command
+    // arrives on that channel.
+    bool adoptResyncChannel(unsigned long now);
+    void applyPacketLossFailsafe(unsigned long now);
 
     portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
     PendingPacket _pending = {};

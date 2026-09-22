@@ -7,20 +7,20 @@
 
 // Deadzone suggestion tuning. A per-axis deadzone must comfortably exceed the
 // joystick's measured resting jitter so a released stick never drifts past it.
-static const int CALIBRATION_DEADZONE_SAFETY_MARGIN = 2; // × the measured rest deviation
-static const int CALIBRATION_DEADZONE_MIN = 20;          // floor for a usable deadzone
+static constexpr int CALIBRATION_DEADZONE_SAFETY_MARGIN = 2; // × the measured rest deviation
+static constexpr int CALIBRATION_DEADZONE_MIN = 20;          // floor for a usable deadzone
 // Real at-rest jitter is only tens of ADC counts. Cap the deviation the suggestion
 // is built from so a single stray reading (a glitch, or the stick bumped during
 // centering) cannot blow the deadzone past a usable value.
-static const int CALIBRATION_MAX_REST_DEVIATION = 150;
+static constexpr int CALIBRATION_MAX_REST_DEVIATION = 150;
 
 // Mid-point of a 12-bit ADC, used as the safe fallback center when no samples were
 // taken (a missing measurement should read as neutral, not 0).
-static const int CALIBRATION_ADC_MIDPOINT = 2048;
+static constexpr int CALIBRATION_ADC_MIDPOINT = 2048;
 // A released, self-centering stick rests near mid-scale. Any centering-phase sample
 // further than this from the mid-point is a deflection or glitch, not rest, and is
 // excluded from the jitter measurement so it cannot skew the deadzone suggestion.
-static const int CALIBRATION_REST_MAX_OFFSET = 900;
+static constexpr int CALIBRATION_REST_MAX_OFFSET = 900;
 
 // Integer mean of the resting samples → the axis center raw value. This is what a
 // user copies into STEERING_CENTER_RAW (X) / THROTTLE_CENTER_RAW (Y).

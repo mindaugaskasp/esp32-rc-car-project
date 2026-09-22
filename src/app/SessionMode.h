@@ -19,7 +19,7 @@ private:
 
     // Hold throttle at least this long on the stats page to reset the session; a
     // shorter tap exits instead (same tap-vs-hold idiom as ResponseTuningScreen).
-    static const unsigned long RESET_HOLD_MS = 800;
+    static constexpr unsigned long RESET_HOLD_MS = 800;
 
     void draw();
     void handleStatsButtons(bool throttleSw, bool steeringSw, unsigned long now);

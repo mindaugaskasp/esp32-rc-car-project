@@ -24,7 +24,7 @@ private:
     // On the PacketTrace page a long steering hold toggles the runtime packet-trace
     // flag (a short press still cycles pages). No other button is free — throttle
     // opens the mode menu and the joystick drives the car.
-    static const unsigned long STEERING_SW_LONG_PRESS_MS = 600;
+    static constexpr unsigned long STEERING_SW_LONG_PRESS_MS = 600;
 
     Page _page = Page::Joystick;
     bool _throttleSwWas = false; // throttle stick = open mode menu (back)

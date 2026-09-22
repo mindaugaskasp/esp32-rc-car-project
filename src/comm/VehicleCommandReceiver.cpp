@@ -24,26 +24,27 @@ void VehicleCommandReceiver::begin() {
     esp_now_register_recv_cb(onVehicleDataReceiveTrampoline);
 }
 
-void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* incomingData, int len) {
-    // A channel advertisement means the transmitter (re)started and is announcing
-    // its channel. Stash it for update() to adopt; it is not a driving command, so
-    // it must not refresh the packet-loss timer.
+// A channel advertisement means the transmitter (re)started and is announcing its
+// channel. Stash it for update() to adopt; it is not a driving command, so it must
+// not refresh the packet-loss timer.
+bool VehicleCommandReceiver::stashChannelAdvertisement(const uint8_t* mac,
+                                                       const uint8_t* incomingData, int len) {
     uint8_t advertisedChannel = 0;
-    if (tryParseChannelAdvertisement(mac, incomingData, len, TRANSMITTER_MAC, &advertisedChannel)) {
-        portENTER_CRITICAL(&_mux);
-        _resyncChannel = advertisedChannel;
-        _resyncChannelPending = true;
-        portEXIT_CRITICAL(&_mux);
-        return;
+    if (!tryParseChannelAdvertisement(mac, incomingData, len, TRANSMITTER_MAC, &advertisedChannel)) {
+        return false;
     }
 
-    // Safety: only the paired transmitter may command the vehicle. Dropping any
-    // other sender here means stray ESP-NOW traffic can never drive the ESC or
-    // servo, and it never refreshes the packet-loss timer — so an absent
-    // transmitter leaves the watchdog to hold the ESC at neutral.
-    if (memcmp(mac, TRANSMITTER_MAC, MAC_ADDRESS_LENGTH) != 0) return;
+    portENTER_CRITICAL(&_mux);
+    _resyncChannel = advertisedChannel;
+    _resyncChannelPending = true;
+    portEXIT_CRITICAL(&_mux);
+    return true;
+}
 
-    unsigned long receivedAt = millis();
+void VehicleCommandReceiver::bufferPendingCommand(const uint8_t* mac,
+                                                  const uint8_t* incomingData, int len) {
+    const unsigned long receivedAt = millis();
+
     size_t copyLength = 0;
     if (len > 0) {
         copyLength = len < static_cast<int>(sizeof(_pending.data))
@@ -51,11 +52,11 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
             : sizeof(_pending.data);
     }
 
-    // Only a well-formed command counts as proof of a live link. Wrong-size
-    // packets are still buffered (so packet tracing can report them) but must
-    // not feed the watchdog — otherwise a stream of undispatched packets could
-    // hold the ESC at its last speed forever.
-    bool validCommandLength = (len == static_cast<int>(sizeof(VehicleData)));
+    // Only a well-formed command counts as proof of a live link. Wrong-size packets
+    // are still buffered (so packet tracing can report them) but must not feed the
+    // watchdog — otherwise a stream of undispatched packets could hold the ESC at
+    // its last speed forever.
+    const bool validCommandLength = (len == static_cast<int>(sizeof(VehicleData)));
 
     portENTER_CRITICAL(&_mux);
     memcpy(_pending.mac, mac, sizeof(_pending.mac));
@@ -65,10 +66,10 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
     _pending.len = len;
     _pendingAvailable = true;
     if (validCommandLength) {
-        // A command landing after watchdog-length silence must force re-arming
-        // even if update() never got to run during the gap (e.g. loop() was
-        // blocked); clearing _escResetDueToLoss below would otherwise hide the
-        // dropout from the watchdog entirely.
+        // A command landing after watchdog-length silence must force re-arming even
+        // if update() never got to run during the gap (e.g. loop() was blocked);
+        // clearing _escResetDueToLoss below would otherwise hide the dropout from
+        // the watchdog entirely.
         if (receivedAt - _lastPacketTime > PACKET_LOSS_TIMEOUT_MS) {
             _rearmAfterGapPending = true;
         }
@@ -79,6 +80,18 @@ void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* in
     portEXIT_CRITICAL(&_mux);
 }
 
+void VehicleCommandReceiver::handleReceive(const uint8_t* mac, const uint8_t* incomingData, int len) {
+    if (stashChannelAdvertisement(mac, incomingData, len)) return;
+
+    // Safety: only the paired transmitter may command the vehicle. Dropping any
+    // other sender here means stray ESP-NOW traffic can never drive the ESC or
+    // servo, and it never refreshes the packet-loss timer — so an absent
+    // transmitter leaves the watchdog to hold the ESC at neutral.
+    if (memcmp(mac, TRANSMITTER_MAC, MAC_ADDRESS_LENGTH) != 0) return;
+
+    bufferPendingCommand(mac, incomingData, len);
+}
+
 bool VehicleCommandReceiver::isLinkAlive() const {
     portENTER_CRITICAL(const_cast<portMUX_TYPE*>(&_mux));
     const bool everReceived = _commandEverReceived;
@@ -87,56 +100,67 @@ bool VehicleCommandReceiver::isLinkAlive() const {
     return everReceived && (millis() - lastPacket) <= PACKET_LOSS_TIMEOUT_MS;
 }
 
-void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& data) {
-    // First real command from the paired transmitter = a confirmed bidirectional
-    // link (we received a command and are about to echo telemetry back), mirroring
-    // when the remote's screen shows "connected". Blocking twitch is fine as a
-    // one-time connection event; it runs before the car is armed to drive.
-    if (!_linkTwitchDone) {
-        _linkTwitchDone = true;
-        twitchServo();
-    }
+// First real command from the paired transmitter = a confirmed bidirectional link
+// (we received a command and are about to echo telemetry back), mirroring when the
+// remote's screen shows "connected". The blocking twitch is safe as a one-time
+// connection event: it runs before the car is armed to drive.
+void VehicleCommandReceiver::signalLinkEstablished() {
+    if (_linkTwitchDone) return;
+    _linkTwitchDone = true;
+    twitchServo();
+}
 
+// Failsafe arming (see comm/ArmingLogic.h): the ESC is held at neutral until a
+// short run of near-neutral throttle commands has arrived, re-armed from zero after
+// every packet-loss timeout. A stray in-range packet can't spin the motor, and a
+// link that drops at full throttle can't slam back to it on reconnect — the stick
+// must return home first. Steering stays live throughout; only propulsion is gated.
+void VehicleCommandReceiver::applyControlOutputs(const VehicleData& data) {
     setServoAngle(data.servoPosition);
 
-    // Failsafe arming (see comm/ArmingLogic.h): the ESC is held at neutral until
-    // a short run of near-neutral throttle commands has arrived, re-armed from
-    // zero after every packet-loss timeout. A stray in-range packet can't spin
-    // the motor, and a link that drops at full throttle can't slam back to full
-    // throttle on reconnect — the stick must return home first. Steering stays
-    // live throughout; only propulsion is gated.
     _armingCount = nextArmingCount(_armingCount, data.escSpeed);
     if (isArmed(_armingCount)) {
         updateEscSpeed(data.escSpeed);
     } else {
         setEscNeutral();
     }
+}
+
+void VehicleCommandReceiver::sendTelemetryAck(const uint8_t* mac, const VehicleData& data,
+                                              LinkPhyMode ackLinkMode) {
+    TelemetryData telemetry;
+    telemetry.batteryVoltage = getBatteryVoltage();
+    telemetry.speedRpm = getMotorRpm();
+    telemetry.echoTimestampMs = data.txTimestampMs;
+    telemetry.linkMode = linkModeToWire(ackLinkMode);
+
+    if (DEBUG_PACKET_TRACE) {
+        debugLogger.logf("Received data: servo=%d esc=%d", data.servoPosition, data.escSpeed);
+    }
+
+    const esp_err_t result = esp_now_send(mac, reinterpret_cast<const uint8_t*>(&telemetry),
+                                          sizeof(telemetry));
+    if (result != ESP_OK) {
+        debugLogger.logf("Telemetry send failed: %d", result);
+    } else if (DEBUG_PACKET_TRACE) {
+        debugLogger.log("Telemetry packet sent back to sender");
+    }
+}
+
+void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& data) {
+    signalLinkEstablished();
+    applyControlOutputs(data);
 
     // Link-mode handshake: the command carries the transmitter's desired PHY. Adopt
     // it if it differs, but ack the new mode in this telemetry frame and send that
     // frame FIRST, while both boards are still on the shared PHY — only then switch.
     // That guarantees the transmitter hears "I'm on the new PHY" before either board
     // leaves the current one. See comm/LinkModeLogic.h.
-    LinkPhyMode transmitterDesired = linkModeFromWire(data.linkMode);
-    bool adoptLinkMode = rxShouldAdopt(transmitterDesired, _appliedLinkMode);
-    LinkPhyMode nextLinkMode = adoptLinkMode ? transmitterDesired : _appliedLinkMode;
+    const LinkPhyMode transmitterDesired = linkModeFromWire(data.linkMode);
+    const bool adoptLinkMode = rxShouldAdopt(transmitterDesired, _appliedLinkMode);
+    const LinkPhyMode nextLinkMode = adoptLinkMode ? transmitterDesired : _appliedLinkMode;
 
-    TelemetryData telemetry;
-    telemetry.batteryVoltage = getBatteryVoltage();
-    telemetry.speedRpm = getMotorRpm();
-    telemetry.echoTimestampMs = data.txTimestampMs;
-    telemetry.linkMode = linkModeToWire(nextLinkMode);
-
-    if (DEBUG_PACKET_TRACE) {
-        debugLogger.logf("Received data: servo=%d esc=%d", data.servoPosition, data.escSpeed);
-    }
-
-    esp_err_t result = esp_now_send(mac, reinterpret_cast<const uint8_t*>(&telemetry), sizeof(telemetry));
-    if (result != ESP_OK) {
-        debugLogger.logf("Telemetry send failed: %d", result);
-    } else if (DEBUG_PACKET_TRACE) {
-        debugLogger.log("Telemetry packet sent back to sender");
-    }
+    sendTelemetryAck(mac, data, nextLinkMode);
 
     if (adoptLinkMode) {
         applyLinkPhyMode(nextLinkMode == LinkPhyMode::LongRange);
@@ -146,7 +170,7 @@ void VehicleCommandReceiver::dispatch(const uint8_t* mac, const VehicleData& dat
     }
 }
 
-void VehicleCommandReceiver::update() {
+void VehicleCommandReceiver::consumePendingPacket() {
     PendingPacket packet;
     bool packetAvailable;
     bool rearmAfterGap;
@@ -168,29 +192,30 @@ void VehicleCommandReceiver::update() {
         debugLogger.log("Command gap exceeded watchdog timeout; re-arming required");
     }
 
-    if (packetAvailable) {
-        if (DEBUG_PACKET_TRACE) {
-            char peerMac[MAC_STRING_BUFFER_SIZE];
-            formatMac(peerMac, packet.mac);
-            debugLogger.logf("Packet received from: %s, len=%d", peerMac, packet.len);
+    if (!packetAvailable) return;
 
-            const char* packetType = (packet.len == sizeof(VehicleData)) ? "VehicleData" : "Unknown";
-            debugLogger.logf("Packet type: %s", packetType);
-        }
+    if (DEBUG_PACKET_TRACE) {
+        char peerMac[MAC_STRING_BUFFER_SIZE];
+        formatMac(peerMac, packet.mac);
+        debugLogger.logf("Packet received from: %s, len=%d", peerMac, packet.len);
 
-        if (packet.len == sizeof(VehicleData)) {
-            VehicleData data;
-            memcpy(&data, packet.data, sizeof(data));
-            dispatch(packet.mac, data);
-        }
+        const char* packetType = (packet.len == sizeof(VehicleData)) ? "VehicleData" : "Unknown";
+        debugLogger.logf("Packet type: %s", packetType);
     }
 
-    unsigned long now = millis();
+    if (packet.len == sizeof(VehicleData)) {
+        VehicleData data;
+        memcpy(&data, packet.data, sizeof(data));
+        dispatch(packet.mac, data);
+    }
+}
 
-    // Adopt a channel learned from a fresh advertisement (transmitter restarted,
-    // possibly on a new channel). Peer channel is 0, so it follows the WiFi channel.
+// A fresh advertisement means the transmitter restarted, possibly on a new
+// channel. Peer channel is 0, so the peer follows the WiFi channel we set here.
+bool VehicleCommandReceiver::adoptResyncChannel(unsigned long now) {
     bool adoptChannel = false;
     uint8_t newChannel = 0;
+
     portENTER_CRITICAL(&_mux);
     if (_resyncChannelPending) {
         adoptChannel = true;
@@ -199,17 +224,19 @@ void VehicleCommandReceiver::update() {
     }
     portEXIT_CRITICAL(&_mux);
 
-    if (adoptChannel) {
-        debugLogger.logf("[RESYNC] Advertisement heard: channel %d (was %d)", newChannel, _operationalChannel);
-        _operationalChannel = newChannel;
-        applyWifiChannel(newChannel);
-        _listeningForResync = false;
-        portENTER_CRITICAL(&_mux);
-        _lastPacketTime = now; // give the resynced link time before re-triggering resync
-        portEXIT_CRITICAL(&_mux);
-        return; // ESC stays neutral until a real command arrives on the new channel
-    }
+    if (!adoptChannel) return false;
 
+    debugLogger.logf("[RESYNC] Advertisement heard: channel %d (was %d)", newChannel, _operationalChannel);
+    _operationalChannel = newChannel;
+    applyWifiChannel(newChannel);
+    _listeningForResync = false;
+    portENTER_CRITICAL(&_mux);
+    _lastPacketTime = now; // give the resynced link time before re-triggering resync
+    portEXIT_CRITICAL(&_mux);
+    return true;
+}
+
+void VehicleCommandReceiver::applyPacketLossFailsafe(unsigned long now) {
     bool shouldResetEsc = false;
 
     portENTER_CRITICAL(&_mux);
@@ -219,15 +246,23 @@ void VehicleCommandReceiver::update() {
     }
     portEXIT_CRITICAL(&_mux);
 
-    if (shouldResetEsc) {
-        _armingCount = 0; // require re-arming before propulsion resumes
-        setEscNeutral();
-        // Center the steering too: coasting with the wheels at the last commanded
-        // lock would swerve the car for as long as the link stays down.
-        setServoAngle(STEERING_CENTER_RAW);
-        debugLogger.log("No ESP-NOW packet received recently; ESC neutral, steering centered");
-    }
+    if (!shouldResetEsc) return;
 
+    _armingCount = 0; // require re-arming before propulsion resumes
+    setEscNeutral();
+    // Center the steering too: coasting with the wheels at the last commanded
+    // lock would swerve the car for as long as the link stays down.
+    setServoAngle(STEERING_CENTER_RAW);
+    debugLogger.log("No ESP-NOW packet received recently; ESC neutral, steering centered");
+}
+
+void VehicleCommandReceiver::update() {
+    consumePendingPacket();
+
+    const unsigned long now = millis();
+    if (adoptResyncChannel(now)) return;
+
+    applyPacketLossFailsafe(now);
     updateResync(now);
 }
 

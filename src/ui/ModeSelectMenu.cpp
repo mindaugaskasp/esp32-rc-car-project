@@ -5,6 +5,7 @@
 #include "drivers/controls/Controls.h"
 #include <Arduino.h>
 #include <stdio.h>
+#include "ui/ScreenUtils.h"
 
 ModeSelectMenu modeSelectMenu;
 
@@ -38,9 +39,7 @@ void ModeSelectMenu::show() {
     char selected[32];
     snprintf(selected, sizeof(selected), "> %s", _names[_cursor]);
     driver->clear();
-    driver->font(ScreenFont::Medium);
-    driver->text(0, 10, "SELECT MODE");
-    driver->hline(0, 13, ScreenDriver::W);
+    drawScreenHeader(*driver, "SELECT MODE");
     driver->font(ScreenFont::Small);
     if (above) driver->scrollText(26, above);
     driver->scrollText(37, selected);

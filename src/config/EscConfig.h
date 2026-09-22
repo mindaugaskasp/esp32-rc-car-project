@@ -12,4 +12,4 @@
 // When enabled the ESC output is mirrored around neutral so Y-up = forward.
 // NOTE: this only mirrors the ESC output. JOY_INVERT_Y (JoystickConfig.h) flips
 // the raw axis — do not enable both for the throttle axis or they cancel out.
-#define THROTTLE_INVERT false
+#define THROTTLE_INVERT true

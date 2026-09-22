@@ -23,9 +23,9 @@ private:
     // Telemetry gaps longer than this (menu navigation, a dropped link) are treated
     // as a pause boundary rather than driving time, so idle minutes don't inflate
     // distance/time or crater the average speed.
-    static const unsigned long MAX_SLICE_MS = 1000;
+    static constexpr unsigned long MAX_SLICE_MS = 1000;
     // Cadence at which a point is appended to the speed-over-time graph.
-    static const unsigned long GRAPH_SAMPLE_MS = 500;
+    static constexpr unsigned long GRAPH_SAMPLE_MS = 500;
 
     SessionStats _stats{};
     SpeedHistory _history{};

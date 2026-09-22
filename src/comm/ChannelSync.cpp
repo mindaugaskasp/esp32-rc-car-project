@@ -8,7 +8,7 @@
 
 // even if the two boards aren't powered on at exactly the same moment. Keep in
 // sync with CHANNEL_SYNC_TIMEOUT_MS in main_receiver.cpp.
-static const unsigned long CHANNEL_BROADCAST_MS = 12000;
+static constexpr unsigned long CHANNEL_BROADCAST_MS = 12000;
 
 ChannelScanResult scanChannel() {
     // Scan for the least congested 2.4GHz channel (runs before ESP-NOW init).
@@ -35,8 +35,8 @@ void broadcastChannelToReceiver(const ChannelScanResult& scanResult) {
 // The receiver alternates 1.5s listening on ADVERTISEMENT_CHANNEL with 1.5s back on
 // the operational channel, so a single advertisement packet would usually miss it.
 // Advertise for longer than one full listen/serve cycle to guarantee an overlap.
-static const unsigned long READVERTISE_AFTER_LOSS_MS = 5000;
-static const unsigned long READVERTISE_WINDOW_MS = 3500;
+static constexpr unsigned long READVERTISE_AFTER_LOSS_MS = 5000;
+static constexpr unsigned long READVERTISE_WINDOW_MS = 3500;
 
 void updateChannelReadvertise(unsigned long now, uint8_t operationalChannel, bool telemetryReceived) {
     static unsigned long lastTelemetryMs = 0;

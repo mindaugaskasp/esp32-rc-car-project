@@ -15,8 +15,13 @@ public:
 
 private:
     static constexpr int PING_RTT_UNSET = 9999; // sentinel for minRtt before any reply arrives
-    static const unsigned long SEND_INTERVAL_MS = 20;
-    static const unsigned long SCREEN_REFRESH_MS = 200; // 5Hz — avoid I2C overhead slowing the send rate
+    static constexpr unsigned long SEND_INTERVAL_MS = 20;
+    static constexpr unsigned long SCREEN_REFRESH_MS = 200; // 5Hz — avoid I2C overhead slowing the send rate
+
+    void sendPingIfDue(unsigned long now);
+    void accumulateRttStats();
+    void refreshScreenIfDue(unsigned long now);
+    void handleButtons();
 
     PingStats _stats{};
     long _rttSum = 0;
